@@ -20,6 +20,8 @@ import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.data.local.WorkLogEntity
+import com.asnidev.trailkeeperoffgrid.model.TrackCreateRequest
+import com.asnidev.trailkeeperoffgrid.model.TrackPointDto
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import java.io.BufferedInputStream
@@ -190,6 +192,102 @@ object Backup {
 
     private inline fun <reified T> list(json: String): List<T> =
         plain.fromJson(json, Array<T>::class.java).toList()
+
+    // ---- GPX (routes & trails) -------------------------------------
+
+    suspend fun exportGpxBundle(context: Context, dest: Uri, author: String): Result =
+        withContext(Dispatchers.IO) {
+            val b = TrailkeeperDb.db.backupDao()
+            try {
+                val segs = ArrayList<Pair<String, Gpx.Segment>>()
+                for (t in b.tracks()) {
+                    val pts = LocalStore.trackPoints(t.id).ifEmpty {
+                        Geo.lineLatLon(t.geometryJson).map { (la, lo) -> TrackPointDto(la, lo) }
+                    }
+                    if (pts.isEmpty()) continue
+                    segs.add(
+                        safeName(t.name, "route", segs) to
+                            Gpx.Segment(t.name, Gpx.Kind.TRACK, pts.map { Gpx.Pt(it.lat, it.lon, it.ele, it.t) })
+                    )
+                }
+                for (tr in b.trails()) {
+                    val pts = Geo.lineLatLon(tr.geometryJson)
+                    if (pts.size < 2) continue
+                    segs.add(
+                        safeName(tr.name, "trail", segs) to
+                            Gpx.Segment(tr.name, Gpx.Kind.ROUTE, pts.map { (la, lo) -> Gpx.Pt(la, lo, null, null) })
+                    )
+                }
+                if (segs.isEmpty()) return@withContext Result(false, "No routes or trails to export")
+
+                context.contentResolver.openOutputStream(dest)?.use { raw ->
+                    ZipOutputStream(raw.buffered()).use { zip ->
+                        for ((fname, seg) in segs) {
+                            zip.putNextEntry(ZipEntry("$fname.gpx"))
+                            zip.write(Gpx.document(listOf(seg), author).toByteArray())
+                            zip.closeEntry()
+                        }
+                    }
+                } ?: return@withContext Result(false, "Couldn't open the destination file")
+                Result(true, "${segs.size} GPX file(s) written")
+            } catch (e: Exception) {
+                Result(false, e.message ?: "GPX export failed")
+            }
+        }
+
+    suspend fun importGpx(context: Context, src: Uri, projectId: String): Result =
+        withContext(Dispatchers.IO) {
+            try {
+                val xml = context.contentResolver.openInputStream(src)?.use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                } ?: return@withContext Result(false, "Couldn't open the file")
+                val segments = Gpx.parse(xml)
+                if (segments.isEmpty()) return@withContext Result(false, "No <trk> or <rte> found")
+
+                var tracks = 0
+                var trails = 0
+                for (s in segments) {
+                    if (s.points.size < 2) continue
+                    when (s.kind) {
+                        Gpx.Kind.TRACK -> {
+                            LocalStore.saveTrack(
+                                TrackCreateRequest(
+                                    projectId = projectId,
+                                    name = s.name,
+                                    activity = "mtb",
+                                    startedAt = s.points.firstOrNull()?.time,
+                                    endedAt = s.points.lastOrNull()?.time,
+                                    movingSeconds = 0,
+                                    points = s.points.map { TrackPointDto(it.lat, it.lon, it.ele, it.time) },
+                                )
+                            )
+                            tracks++
+                        }
+                        Gpx.Kind.ROUTE -> {
+                            LocalStore.createTrail(
+                                s.name, "mtb",
+                                s.points.map { it.lat to it.lon },
+                                source = "imported",
+                            )
+                            trails++
+                        }
+                    }
+                }
+                Result(true, "Imported $tracks route(s) and $trails trail(s)")
+            } catch (e: Exception) {
+                Result(false, e.message ?: "GPX import failed")
+            }
+        }
+
+    private fun safeName(name: String, fallback: String, taken: List<Pair<String, *>>): String {
+        val base = name.trim().ifBlank { fallback }
+            .replace(Regex("[^A-Za-z0-9 _-]"), "").trim().replace(' ', '_').ifBlank { fallback }
+        var n = base
+        var i = 2
+        val used = taken.map { it.first }.toSet()
+        while (n in used) { n = "${base}_$i"; i++ }
+        return n
+    }
 
     private fun featureCollection(geoms: List<String>): String =
         """{"type":"FeatureCollection","features":[""" +

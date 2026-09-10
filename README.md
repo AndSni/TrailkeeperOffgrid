@@ -26,9 +26,9 @@ Installs alongside Trailkeeper (`applicationId com.asnidev.trailkeeperoffgrid`).
 |-------|-------|
 | **P0 — fork & strip** | ✅ repo, package rename, build, CI (`android.yml` + `release.yml`) |
 | **P1 — de-server the data layer** | ✅ auth + network + sync removed; Room is the source of truth; on-device length/area/nearest-trail/rollups; opens straight to the project list |
-| **P2 — offline maps** | ◐ Settings → Offline maps ships: pick a region (Rīga & Vidzeme / Latvia / Baltics), download it to phone storage via MapLibre's offline store, see progress, delete, storage readout. Vendored self-contained style + `pmtiles://` local file still to come. |
-| **P3 — settings: username, DB cleanup, backup/restore** | ◐ Settings screen live: optional display name, "Clear photos of completed tasks", storage breakdown. Backup/restore zip + GPX/GeoJSON import-export still to come. |
-| **P4 — off-grid field features** | ⏳ track-back, coordinate formats, reminders |
+| **P2 — offline maps** | ◐ Settings → Offline maps: pick a region (Rīga & Vidzeme / Latvia / Baltics), download it to phone storage via MapLibre's offline store, progress, delete, storage readout. Vendored self-contained style + `pmtiles://` local file still to come. |
+| **P3 — settings: username, DB cleanup, backup/restore** | ◐ Settings: optional display name, "Clear photos of completed tasks", storage breakdown, **full-workspace backup/restore zip** (data + GeoJSON + photos; merge or replace). GPX import/export still to come. |
+| **P4 — off-grid field features** | ◐ **local reminders** (inspection-due / task-overdue, WorkManager → notification inbox). Track-back and multi-format coordinates still to come. |
 | **P5 — trail condition reporting** | ⏳ |
 
 Bumped to MapLibre 11.8 (has `pmtiles://` support for the next map step).
