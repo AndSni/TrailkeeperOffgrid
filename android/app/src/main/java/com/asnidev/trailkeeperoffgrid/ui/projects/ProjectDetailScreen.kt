@@ -124,6 +124,13 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                 .observeForProject(projectId)
         }
             .collectAsState(initial = emptyList())
+    val reports by
+        remember {
+            com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb.db
+                .trailReportDao()
+                .observeForOrg(com.asnidev.trailkeeperoffgrid.data.Identity.ORG_ID)
+        }
+            .collectAsState(initial = emptyList())
     val messages by vm.discussion.collectAsState()
     val commentCounts by vm.taskCommentCounts.collectAsState()
     val unreadCommentTasks by vm.unreadCommentTasks.collectAsState()
@@ -289,6 +296,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                                 tasks = s.tasks,
                                 structures = structures,
                                 tracks = tracks,
+                                reports = reports,
                                 hasLocationPermission = hasLocation,
                                 modifier = Modifier.fillMaxSize(),
                                 focus = mapFocus,

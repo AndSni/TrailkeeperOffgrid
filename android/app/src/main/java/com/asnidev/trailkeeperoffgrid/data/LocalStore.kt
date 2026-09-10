@@ -354,6 +354,50 @@ object LocalStore {
 
     suspend fun deleteStructure(id: String) = db.structureDao().deleteById(id)
 
+    // ---- trail-condition reports (P5) ------------------------------
+
+    suspend fun createTrailReport(
+        projectId: String?,
+        status: String,
+        kind: String,
+        severity: String,
+        note: String,
+        lat: Double?,
+        lon: Double?,
+    ): String {
+        val id = newId()
+        val geometry = if (lat != null && lon != null) Geo.pointJson(lat, lon) else null
+        val nearest =
+            if (lat != null && lon != null)
+                Geo.nearestTrailId(lat, lon, db.trailDao().listForOrg(Identity.ORG_ID))
+            else null
+        db.trailReportDao().upsert(
+            com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity(
+                id = id,
+                organisationId = Identity.ORG_ID,
+                projectId = projectId,
+                status = status,
+                kind = kind,
+                severity = severity,
+                note = note.trim(),
+                geometryJson = geometry,
+                nearestTrailId = nearest,
+                photosJson = "[]",
+                reportedById = Identity.USER_ID,
+                createdAt = nowIso(),
+                resolvedAt = null,
+            )
+        )
+        return id
+    }
+
+    suspend fun setReportResolved(id: String, resolved: Boolean) {
+        val r = db.trailReportDao().getById(id) ?: return
+        db.trailReportDao().upsert(r.copy(resolvedAt = if (resolved) nowIso() else null))
+    }
+
+    suspend fun deleteTrailReport(id: String) = db.trailReportDao().deleteById(id)
+
     // ---- inspections -----------------------------------------------
 
     suspend fun createInspection(req: InspectionCreateRequest): String {

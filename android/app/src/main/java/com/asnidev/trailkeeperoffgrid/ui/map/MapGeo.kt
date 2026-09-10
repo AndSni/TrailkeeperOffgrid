@@ -4,6 +4,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
 import com.google.gson.JsonArray
 import com.google.gson.JsonParser
 import org.maplibre.android.geometry.LatLng
@@ -55,6 +56,18 @@ object MapGeo {
                     feature(
                         g,
                         """"id":${quote(s.id)},"kind":"structure","type":${quote(s.structureType)},"status":${quote(s.status)},"dim":${s.id in dimmed}$colorProp""",
+                    )
+                }
+            }
+        )
+
+    fun reportFeatures(reports: List<TrailReportEntity>): String =
+        featureCollection(
+            reports.mapNotNull { r ->
+                r.geometryJson?.let { g ->
+                    feature(
+                        g,
+                        """"id":${quote(r.id)},"kind":"report","status":${quote(r.status)},"severity":${quote(r.severity)},"resolved":${r.resolvedAt != null}""",
                     )
                 }
             }

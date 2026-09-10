@@ -189,6 +189,29 @@ data class InspectionEntity(
     val notes: String,
 )
 
+/**
+ * A trail-condition report — the "monitoring" half of the app, decoupled
+ * from a [TaskEntity] (which is planned work). Log what you find on the
+ * trail whether or not anyone will fix it: a blowdown, a washout, a
+ * bridge out. Point geometry, org-wide like a structure. Added in DB v2.
+ */
+@Entity(tableName = "trail_reports")
+data class TrailReportEntity(
+    @PrimaryKey val id: String,
+    val organisationId: String,
+    val projectId: String?,          // the project it was logged from, if any
+    val status: String,              // passable | caution | impassable
+    val kind: String,                // blowdown | washout | bridge | overgrown | erosion | sign | drainage | other
+    val severity: String,            // low | medium | high
+    val note: String,
+    val geometryJson: String?,       // GeoJSON Point
+    val nearestTrailId: String?,
+    val photosJson: String,          // JSON array of {id, caption, url}
+    val reportedById: String?,
+    val createdAt: String,
+    val resolvedAt: String?,         // set when the condition is cleared
+)
+
 /** A recorded or imported GPX route. Geometry kept as raw GeoJSON for the
  * map; the per-point detail lives only on the server (fetch via GPX). */
 @Entity(tableName = "tracks")

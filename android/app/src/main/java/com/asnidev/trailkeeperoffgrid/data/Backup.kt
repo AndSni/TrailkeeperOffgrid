@@ -18,6 +18,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.data.local.WorkLogEntity
 import com.asnidev.trailkeeperoffgrid.model.TrackCreateRequest
@@ -111,6 +112,7 @@ object Backup {
                     put("data/inspection_forms.json", pretty.toJson(b.inspectionForms()))
                     put("data/inspections.json", pretty.toJson(b.inspections()))
                     put("data/tracks.json", pretty.toJson(tracks))
+                    put("data/trail_reports.json", pretty.toJson(b.trailReports()))
 
                     put("geojson/trails.geojson", featureCollection(trails.mapNotNull { it.geometryJson }))
                     put("geojson/tasks.geojson", featureCollection(tasks.mapNotNull { it.geometryJson }))
@@ -175,6 +177,7 @@ object Backup {
                     json["inspection_forms"]?.let { db.inspectionFormDao().upsertAll(list<InspectionFormEntity>(it)) }
                     json["inspections"]?.let { db.inspectionDao().upsertAll(list<InspectionEntity>(it)) }
                     json["tracks"]?.let { db.trackDao().upsertAll(list<TrackEntity>(it)) }
+                    json["trail_reports"]?.let { db.trailReportDao().upsertAll(list<TrailReportEntity>(it)) }
                 }
 
                 val photoRoot = File(context.getExternalFilesDir(null), "photos")
