@@ -11,9 +11,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Trailkeeper Offgrid's local database — the **only** copy of the user's
  * data. There is no server to re-sync from, so:
  *
- *  - `exportSchema = true`: the schema JSON is committed under
- *    `app/schemas/` and every version bump ships a tested [Migration]
- *    (see `src/test/.../MigrationTest.kt`).
+ *  - `exportSchema = true`: the schema JSON for every version is committed
+ *    under `app/schemas/`. Each [Migration]'s DDL is checked byte-for-byte
+ *    against the exported `createSql` of the target version before release
+ *    (a Robolectric `MigrationTestHelper` harness was tried but is far too
+ *    slow to run in this environment / CI).
  *  - **No** `fallbackToDestructiveMigration()`. A missing migration throws
  *    loudly at open instead of silently wiping the field data.
  *
