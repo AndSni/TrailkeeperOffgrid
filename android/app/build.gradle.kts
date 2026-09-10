@@ -104,7 +104,7 @@ dependencies {
 
     // MapLibre Native - vector map, trail/task overlays, the GPS puck.
     // Offline .pmtiles tiles are the next slice (docs/BLUEPRINT.md sec 5).
-    implementation("org.maplibre.gl:android-sdk:11.5.2")
+    implementation("org.maplibre.gl:android-sdk:11.8.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

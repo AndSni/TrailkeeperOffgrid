@@ -26,13 +26,14 @@ Installs alongside Trailkeeper (`applicationId com.asnidev.trailkeeperoffgrid`).
 |-------|-------|
 | **P0 — fork & strip** | ✅ repo, package rename, build, CI (`android.yml` + `release.yml`) |
 | **P1 — de-server the data layer** | ✅ auth + network + sync removed; Room is the source of truth; on-device length/area/nearest-trail/rollups; opens straight to the project list |
-| **P2 — offline maps** | ⏳ next — PMTiles spike, vendored style, Settings → Offline maps |
-| **P3 — settings: username, DB cleanup, backup/restore** | ⏳ (`LocalStore.purgeDoneTaskPhotos` + `Identity` display name already in place) |
+| **P2 — offline maps** | ◐ Settings → Offline maps ships: pick a region (Rīga & Vidzeme / Latvia / Baltics), download it to phone storage via MapLibre's offline store, see progress, delete, storage readout. Vendored self-contained style + `pmtiles://` local file still to come. |
+| **P3 — settings: username, DB cleanup, backup/restore** | ◐ Settings screen live: optional display name, "Clear photos of completed tasks", storage breakdown. Backup/restore zip + GPX/GeoJSON import-export still to come. |
 | **P4 — off-grid field features** | ⏳ track-back, coordinate formats, reminders |
 | **P5 — trail condition reporting** | ⏳ |
 
-The map tab currently still points at an online MapLibre style; it works
-where there is signal and goes blank where there isn't, until P2.
+Bumped to MapLibre 11.8 (has `pmtiles://` support for the next map step).
+The map tab still points at an online style, but any region you download in
+Settings is then served from local storage with no network.
 
 ## Layout
 

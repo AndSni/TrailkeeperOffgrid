@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import com.asnidev.trailkeeperoffgrid.ui.notifications.NotificationsScreen
 import com.asnidev.trailkeeperoffgrid.ui.projects.ProjectDetailScreen
 import com.asnidev.trailkeeperoffgrid.ui.projects.ProjectListScreen
+import com.asnidev.trailkeeperoffgrid.ui.settings.SettingsScreen
 
 private data class OpenProject(val id: String, val name: String)
 
@@ -22,9 +23,11 @@ private val openProjectSaver: Saver<OpenProject?, List<String>> =
 fun TrailkeeperApp() {
     var open by rememberSaveable(stateSaver = openProjectSaver) { mutableStateOf<OpenProject?>(null) }
     var showNotifications by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
 
     val current = open
     when {
+        showSettings -> SettingsScreen(onBack = { showSettings = false })
         showNotifications -> NotificationsScreen(onBack = { showNotifications = false })
         current != null ->
             ProjectDetailScreen(
@@ -36,6 +39,7 @@ fun TrailkeeperApp() {
             ProjectListScreen(
                 onOpenProject = { id, name -> open = OpenProject(id, name) },
                 onOpenNotifications = { showNotifications = true },
+                onOpenSettings = { showSettings = true },
             )
     }
 }
