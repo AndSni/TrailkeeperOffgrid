@@ -1,8 +1,10 @@
 package com.asnidev.trailkeeperoffgrid.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
@@ -53,6 +55,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val remindersEnabled: StateFlow<Boolean> =
         Reminders.enabledFlow(ctx)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    val lastBackup: StateFlow<String?> =
+        Backup.lastBackupFlow(ctx)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -142,6 +148,28 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun checkRemindersNow() {
         Reminders.runNow(ctx)
         _message.value = "Checking for inspection-due and overdue tasks…"
+    }
+
+    fun exportBackup(dest: Uri) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            val r = Backup.exportWorkspace(ctx, dest)
+            _busy.value = false
+            _message.value = if (r.ok) "Backup saved." else "Backup failed: ${r.detail}"
+        }
+    }
+
+    fun restoreBackup(src: Uri, replace: Boolean) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            val r = Backup.importWorkspace(ctx, src, replace)
+            _busy.value = false
+            _message.value =
+                if (r.ok) "Restored. ${r.detail}" else "Restore failed: ${r.detail}"
+            refreshStorage()
+        }
     }
 
     fun clearMessage() { _message.value = null }

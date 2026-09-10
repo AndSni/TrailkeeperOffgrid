@@ -49,6 +49,7 @@ abstract class TrailkeeperDb : RoomDatabase() {
     abstract fun inspectionFormDao(): InspectionFormDao
     abstract fun inspectionDao(): InspectionDao
     abstract fun trackDao(): TrackDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         @Volatile private var built: TrailkeeperDb? = null

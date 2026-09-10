@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
 interface ProjectDao {
     @Upsert suspend fun upsert(row: ProjectEntity)
 
+    @Upsert suspend fun upsertAll(rows: List<ProjectEntity>)
+
     @Query("SELECT * FROM projects WHERE id = :id") fun observe(id: String): Flow<ProjectEntity?>
 
     @Query("SELECT * FROM projects WHERE id = :id") suspend fun getById(id: String): ProjectEntity?
@@ -241,4 +243,23 @@ interface NotificationDao {
     suspend fun markAllRead(ts: String)
 
     @Query("DELETE FROM notifications") suspend fun clear()
+}
+
+/** Whole-table reads for the Settings → Backup export. Import reuses each
+ * entity DAO's `upsertAll`. */
+@Dao
+interface BackupDao {
+    @Query("SELECT * FROM projects") suspend fun projects(): List<ProjectEntity>
+    @Query("SELECT * FROM trails") suspend fun trails(): List<TrailEntity>
+    @Query("SELECT * FROM tasks") suspend fun tasks(): List<TaskEntity>
+    @Query("SELECT * FROM work_logs") suspend fun workLogs(): List<WorkLogEntity>
+    @Query("SELECT * FROM project_members") suspend fun members(): List<ProjectMemberEntity>
+    @Query("SELECT * FROM messages") suspend fun messages(): List<MessageEntity>
+    @Query("SELECT * FROM notifications") suspend fun notifications(): List<NotificationEntity>
+    @Query("SELECT * FROM job_types") suspend fun jobTypes(): List<JobTypeEntity>
+    @Query("SELECT * FROM segment_work") suspend fun segmentWork(): List<SegmentWorkEntity>
+    @Query("SELECT * FROM structures") suspend fun structures(): List<StructureEntity>
+    @Query("SELECT * FROM inspection_forms") suspend fun inspectionForms(): List<InspectionFormEntity>
+    @Query("SELECT * FROM inspections") suspend fun inspections(): List<InspectionEntity>
+    @Query("SELECT * FROM tracks") suspend fun tracks(): List<TrackEntity>
 }
