@@ -15,6 +15,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -37,6 +38,7 @@ private const val TRAIL_SRC = "tk-trails"
 private const val TRACK_SRC = "tk-tracks"
 private const val TASK_SRC = "tk-tasks"
 private const val STRUCTURE_SRC = "tk-structures"
+private const val REPORT_SRC = "tk-reports"
 private val LATVIA = LatLng(56.95, 24.6)
 
 /** (lat, lon, nonce) - bump the nonce to re-trigger a fly-to. */
@@ -57,6 +59,7 @@ fun ProjectMap(
     tasks: List<TaskEntity>,
     structures: List<StructureEntity>,
     tracks: List<TrackEntity>,
+    reports: List<TrailReportEntity> = emptyList(),
     hasLocationPermission: Boolean,
     modifier: Modifier = Modifier,
     focus: MapFocus? = null,
@@ -87,6 +90,7 @@ fun ProjectMap(
                             "$STRUCTURE_SRC-dot",
                             "$TRACK_SRC-line",
                             "$TRAIL_SRC-line",
+                            "$REPORT_SRC-dot",
                         ).firstOrNull { it.hasProperty("id") && it.hasProperty("kind") }
                     if (hit != null) {
                         onTapHolder[0]?.invoke(
@@ -104,6 +108,7 @@ fun ProjectMap(
                     style.addSource(GeoJsonSource(TRACK_SRC))
                     style.addSource(GeoJsonSource(TASK_SRC))
                     style.addSource(GeoJsonSource(STRUCTURE_SRC))
+                    style.addSource(GeoJsonSource(REPORT_SRC))
                     style.addLayer(
                         LineLayer("$TRAIL_SRC-line", TRAIL_SRC).withProperties(
                             PropertyFactory.lineColor("#3C5A31"),
@@ -147,9 +152,31 @@ fun ProjectMap(
                             PropertyFactory.circleStrokeOpacity(dimSwitch(0.35f, 1f)),
                         )
                     )
+                    style.addLayer(
+                        CircleLayer("$REPORT_SRC-dot", REPORT_SRC).withProperties(
+                            PropertyFactory.circleRadius(5f),
+                            PropertyFactory.circleColor(
+                                Expression.match(
+                                    Expression.get("status"),
+                                    Expression.literal("passable"), Expression.color(0xFF4C6B3C.toInt()),
+                                    Expression.literal("caution"), Expression.color(0xFFD6A64B.toInt()),
+                                    Expression.literal("impassable"), Expression.color(0xFFB23B3B.toInt()),
+                                    Expression.color(0xFFB23B3B.toInt()),
+                                )
+                            ),
+                            PropertyFactory.circleOpacity(
+                                Expression.switchCase(
+                                    Expression.get("resolved"), Expression.literal(0.3f),
+                                    Expression.literal(1f),
+                                )
+                            ),
+                            PropertyFactory.circleStrokeWidth(2f),
+                            PropertyFactory.circleStrokeColor("#FFFFFF"),
+                        )
+                    )
                     enableLocation(context, map, style, hasLocationPermission)
                     pushData(
-                        holder, trails, tasks, structures, tracks,
+                        holder, trails, tasks, structures, tracks, reports,
                         projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
                     )
                 }
@@ -181,7 +208,7 @@ fun ProjectMap(
         modifier = modifier,
         update = {
             pushData(
-                holder, trails, tasks, structures, tracks,
+                holder, trails, tasks, structures, tracks, reports,
                 projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
             )
             if (focus != null && focus.third != holder.lastFocusNonce) {
@@ -201,6 +228,7 @@ private fun pushData(
     tasks: List<TaskEntity>,
     structures: List<StructureEntity>,
     tracks: List<TrackEntity>,
+    reports: List<TrailReportEntity>,
     projectTrailIds: Set<String>,
     projectStructureIds: Set<String>,
     projectBounds: LatLngBounds?,
@@ -220,6 +248,7 @@ private fun pushData(
     (style.getSource(TASK_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.taskFeatures(tasks))
     (style.getSource(STRUCTURE_SRC) as? GeoJsonSource)
         ?.setGeoJson(MapGeo.structureFeatures(structures, dimStructures))
+    (style.getSource(REPORT_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.reportFeatures(reports))
 
     if (!holder.fittedCamera) {
         val bounds = projectBounds ?: MapGeo.bounds(trails, tasks, structures, tracks)

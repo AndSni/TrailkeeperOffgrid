@@ -4,17 +4,21 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Trailkeeper Offgrid's local database — the **only** copy of the user's
  * data. There is no server to re-sync from, so:
  *
  *  - `exportSchema = true`: the schema JSON is committed under
- *    `app/schemas/` and every version bump must ship a tested [androidx.room.migration.Migration].
+ *    `app/schemas/` and every version bump ships a tested [Migration]
+ *    (see `src/test/.../MigrationTest.kt`).
  *  - **No** `fallbackToDestructiveMigration()`. A missing migration throws
  *    loudly at open instead of silently wiping the field data.
  *
- * (A `MigrationTestHelper` harness is the next hardening slice.)
+ * ## Migration history
+ * - v1 → v2: add `trail_reports` (P5 trail-condition reports).
  */
 @Database(
     entities = [
@@ -30,9 +34,10 @@ import androidx.room.RoomDatabase
         StructureEntity::class,
         InspectionFormEntity::class,
         InspectionEntity::class,
+        TrailReportEntity::class,
         TrackEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class TrailkeeperDb : RoomDatabase() {
@@ -48,10 +53,35 @@ abstract class TrailkeeperDb : RoomDatabase() {
     abstract fun structureDao(): StructureDao
     abstract fun inspectionFormDao(): InspectionFormDao
     abstract fun inspectionDao(): InspectionDao
+    abstract fun trailReportDao(): TrailReportDao
     abstract fun trackDao(): TrackDao
     abstract fun backupDao(): BackupDao
 
     companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `trail_reports` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`organisationId` TEXT NOT NULL, " +
+                        "`projectId` TEXT, " +
+                        "`status` TEXT NOT NULL, " +
+                        "`kind` TEXT NOT NULL, " +
+                        "`severity` TEXT NOT NULL, " +
+                        "`note` TEXT NOT NULL, " +
+                        "`geometryJson` TEXT, " +
+                        "`nearestTrailId` TEXT, " +
+                        "`photosJson` TEXT NOT NULL, " +
+                        "`reportedById` TEXT, " +
+                        "`createdAt` TEXT NOT NULL, " +
+                        "`resolvedAt` TEXT, " +
+                        "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+
         @Volatile private var built: TrailkeeperDb? = null
 
         /** Call once from MainActivity with the application context. */
@@ -72,6 +102,7 @@ abstract class TrailkeeperDb : RoomDatabase() {
                                 TrailkeeperDb::class.java,
                                 "trailkeeper_offgrid.db",
                             )
+                            .addMigrations(*ALL_MIGRATIONS)
                             .build()
                             .also { built = it }
                 }

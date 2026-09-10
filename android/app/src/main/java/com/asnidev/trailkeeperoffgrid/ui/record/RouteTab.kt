@@ -40,8 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
+import com.asnidev.trailkeeperoffgrid.data.TrailReports
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.record.RecPhase
 import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
@@ -62,10 +65,16 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
     val tracks by remember(projectId) {
         TrailkeeperDb.db.trackDao().observeForProject(projectId)
     }.collectAsState(initial = emptyList())
+    val allReports by remember {
+        TrailkeeperDb.db.trailReportDao().observeForOrg(Identity.ORG_ID)
+    }.collectAsState(initial = emptyList())
+    val reports = allReports.filter { it.projectId == projectId }
 
     var message by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var showMark by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
+    var pendingDeleteReport by remember { mutableStateOf<TrailReportEntity?>(null) }
     var name by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize()) {
@@ -163,7 +172,31 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                 }
             }
 
+            item {
+                OutlinedButton(
+                    onClick = { showReport = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Report a trail condition") }
+            }
+
             item { HorizontalDivider() }
+
+            if (reports.isNotEmpty()) {
+                item {
+                    Text(
+                        "Condition reports (${reports.count { it.resolvedAt == null }} open)",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
+                items(reports, key = { it.id }) { r ->
+                    ReportCard(
+                        r = r,
+                        onToggle = { scope.launch { LocalStore.setReportResolved(r.id, r.resolvedAt == null) } },
+                        onDelete = { pendingDeleteReport = r },
+                    )
+                }
+                item { HorizontalDivider() }
+            }
 
             if (tracks.isEmpty()) {
                 item {
@@ -178,6 +211,40 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                 items(tracks, key = { it.id }) { TrackCard(it) }
             }
         }
+    }
+
+    if (showReport) {
+        ReportConditionDialog(
+            onDismiss = { showReport = false },
+            onSubmit = { status, kind, severity, note ->
+                showReport = false
+                scope.launch {
+                    val loc = lastLocation(context)
+                    runCatching {
+                        LocalStore.createTrailReport(
+                            projectId, status, kind, severity, note,
+                            loc?.latitude, loc?.longitude,
+                        )
+                    }.onFailure { e -> message = e.message ?: "Couldn't save the report" }
+                    if (loc == null) message = "Saved, but without a location (no GPS fix)."
+                }
+            },
+        )
+    }
+
+    pendingDeleteReport?.let { r ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteReport = null },
+            title = { Text("Delete this report?") },
+            text = { Text("${TrailReports.label(r.kind)} · ${r.status}") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { LocalStore.deleteTrailReport(r.id) }
+                    pendingDeleteReport = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeleteReport = null }) { Text("Cancel") } },
+        )
     }
 
     if (showMark) {
@@ -243,6 +310,99 @@ private fun MarkSpotDialog(onDismiss: () -> Unit, onMark: (String, String) -> Un
         },
         confirmButton = {
             TextButton(enabled = title.isNotBlank(), onClick = { onMark(title.trim(), priority) }) { Text("Mark") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ReportCard(
+    r: TrailReportEntity,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val resolved = r.resolvedAt != null
+    val accent = when (r.status) {
+        "passable" -> Color(0xFF4C6B3C)
+        "caution" -> Color(0xFFD6A64B)
+        else -> Color(0xFFB23B3B)
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(color = accent, shape = RoundedCornerShape(4.dp)) {
+                    Text(
+                        r.status.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+                Text(
+                    "${TrailReports.label(r.kind)} · ${r.severity}",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            if (r.note.isNotBlank()) {
+                Text(r.note, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                r.createdAt.take(10) + if (resolved) " · resolved" else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onToggle) { Text(if (resolved) "Reopen" else "Mark resolved") }
+                TextButton(onClick = onDelete) { Text("Delete") }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReportConditionDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (status: String, kind: String, severity: String, note: String) -> Unit,
+) {
+    var status by remember { mutableStateOf("caution") }
+    var kind by remember { mutableStateOf(TrailReports.KINDS.first()) }
+    var severity by remember { mutableStateOf("medium") }
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Trail condition") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Logged at your current location.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Passability", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TrailReports.STATUSES.forEach { s ->
+                        FilterChip(selected = status == s, onClick = { status = s }, label = { Text(s) })
+                    }
+                }
+                Text("What", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TrailReports.KINDS.forEach { k ->
+                        FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(TrailReports.label(k)) })
+                    }
+                }
+                Text("Severity", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TrailReports.SEVERITIES.forEach { s ->
+                        FilterChip(selected = severity == s, onClick = { severity = s }, label = { Text(s) })
+                    }
+                }
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Note (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSubmit(status, kind, severity, note.trim()) }) { Text("Save report") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

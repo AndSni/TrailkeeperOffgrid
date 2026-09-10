@@ -160,6 +160,21 @@ interface InspectionDao {
 }
 
 @Dao
+interface TrailReportDao {
+    @Upsert suspend fun upsert(row: TrailReportEntity)
+
+    @Upsert suspend fun upsertAll(rows: List<TrailReportEntity>)
+
+    @Query("SELECT * FROM trail_reports WHERE organisationId = :orgId ORDER BY createdAt DESC")
+    fun observeForOrg(orgId: String): Flow<List<TrailReportEntity>>
+
+    @Query("SELECT * FROM trail_reports WHERE id = :id")
+    suspend fun getById(id: String): TrailReportEntity?
+
+    @Query("DELETE FROM trail_reports WHERE id = :id") suspend fun deleteById(id: String)
+}
+
+@Dao
 interface TrackDao {
     @Upsert suspend fun upsertAll(rows: List<TrackEntity>)
 
@@ -262,4 +277,5 @@ interface BackupDao {
     @Query("SELECT * FROM inspection_forms") suspend fun inspectionForms(): List<InspectionFormEntity>
     @Query("SELECT * FROM inspections") suspend fun inspections(): List<InspectionEntity>
     @Query("SELECT * FROM tracks") suspend fun tracks(): List<TrackEntity>
+    @Query("SELECT * FROM trail_reports") suspend fun trailReports(): List<TrailReportEntity>
 }
