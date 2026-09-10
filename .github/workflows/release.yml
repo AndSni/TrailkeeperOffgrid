@@ -1,0 +1,108 @@
+name: release
+
+# Builds a signed release APK and makes it downloadable two ways:
+#   1. committed into the repo at dist/TrailkeeperOffgrid.apk (raw URL)
+#   2. a rolling GitHub Release tagged `latest`
+# See docs/BLUEPRINT.md sec 2.3.
+#
+# Signing secrets (optional — without them the APK is debug-signed but still
+# installs):
+#   RELEASE_KEYSTORE_B64      base64 of the .jks
+#   RELEASE_KEYSTORE_PASSWORD store password
+#   RELEASE_KEY_ALIAS         key alias
+#   RELEASE_KEY_PASSWORD      key password
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["android/**", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure release signing
+        working-directory: android
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > release.jks
+            {
+              echo "storeFile=release.jks"
+              echo "storePassword=$KS_PASS"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "keyPassword=$KEY_PASS"
+            } > keystore.properties
+            echo "Release signing configured."
+          else
+            echo "No RELEASE_KEYSTORE_B64 secret — APK will be debug-signed."
+          fi
+
+      - name: Assemble release
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Stage APK into dist/ + refresh update.json
+        id: stage
+        run: |
+          set -e
+          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          VNAME=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          VCODE=$(grep -oP 'versionCode = \K[0-9]+' android/app/build.gradle.kts)
+          echo "vname=$VNAME" >> "$GITHUB_OUTPUT"
+          echo "vcode=$VCODE" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          cp "$APK" "dist/TrailkeeperOffgrid.apk"
+          cp "$APK" "dist/TrailkeeperOffgrid-${VNAME}-${VCODE}.apk"
+          cat > dist/update.json <<EOF
+          {
+            "versionCode": ${VCODE},
+            "versionName": "${VNAME}",
+            "apkUrl": "https://github.com/${GITHUB_REPOSITORY}/raw/main/dist/TrailkeeperOffgrid.apk",
+            "changelog": "Build from ${GITHUB_SHA}"
+          }
+          EOF
+
+      - name: Commit APK back to the repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          if git diff --cached --quiet; then
+            echo "dist/ unchanged."
+          else
+            git commit -m "release: APK ${{ steps.stage.outputs.vname }} (${{ steps.stage.outputs.vcode }}) [skip ci]"
+            git push
+          fi
+
+      - name: Publish rolling 'latest' release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest \
+            "dist/TrailkeeperOffgrid.apk" \
+            --title "Latest (${{ steps.stage.outputs.vname }})" \
+            --notes "Rolling build of \`main\`. Install: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/TrailkeeperOffgrid.apk"

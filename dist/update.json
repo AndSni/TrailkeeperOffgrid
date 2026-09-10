@@ -1,0 +1,6 @@
+{
+  "versionCode": 1,
+  "versionName": "0.1.0",
+  "apkUrl": "https://github.com/AndSni/TrailkeeperOffgrid/raw/main/dist/TrailkeeperOffgrid.apk",
+  "changelog": "P0 + P1: offline-only field app. Local Room database is the source of truth; no backend, no account. Offline map tiles and the Settings screens land next."
+}
