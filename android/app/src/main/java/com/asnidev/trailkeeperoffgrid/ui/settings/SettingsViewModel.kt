@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
+import com.asnidev.trailkeeperoffgrid.data.Reminders
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val downloads = MutableStateFlow<Map<String, RegionDownloadUi>>(emptyMap())
 
     val storage = MutableStateFlow(StorageUi())
+
+    val remindersEnabled: StateFlow<Boolean> =
+        Reminders.enabledFlow(ctx)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -128,6 +133,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 else "Cleared $files photo(s) from $tasks completed task(s), freed ${humanBytes(bytes)}. Task data kept."
             refreshStorage()
         }
+    }
+
+    fun setReminders(on: Boolean) {
+        viewModelScope.launch { Reminders.setEnabled(ctx, on) }
+    }
+
+    fun checkRemindersNow() {
+        Reminders.runNow(ctx)
+        _message.value = "Checking for inspection-due and overdue tasks…"
     }
 
     fun clearMessage() { _message.value = null }

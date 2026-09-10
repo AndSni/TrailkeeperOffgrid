@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
+import com.asnidev.trailkeeperoffgrid.data.Reminders
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.ui.theme.TrailkeeperTheme
 import kotlinx.coroutines.launch
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
         TrailkeeperDb.init(applicationContext)
         LocalStore.init(applicationContext)
         lifecycleScope.launch { runCatching { LocalStore.seedIfEmpty() } }
+        Reminders.schedule(applicationContext)
 
         setContent {
             TrailkeeperTheme {

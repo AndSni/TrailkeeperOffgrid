@@ -90,6 +90,9 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Local reminders (inspection due / task overdue) — no server, no FCM.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     // Room - the local database (the ONLY copy of the user's data).
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")

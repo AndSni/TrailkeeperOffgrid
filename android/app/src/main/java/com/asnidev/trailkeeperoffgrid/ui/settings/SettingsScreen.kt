@@ -77,6 +77,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
         ) {
             item { ProfileCard(vm) }
             item { OfflineMapsCard(vm) }
+            item { RemindersCard(vm) }
             item { StorageCard(vm) }
             item { AboutCard() }
         }
@@ -221,6 +222,26 @@ private fun StorageRow(label: String, bytes: Long, bold: Boolean = false) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
         )
+    }
+}
+
+@Composable
+private fun RemindersCard(vm: SettingsViewModel) {
+    val on by vm.remindersEnabled.collectAsState()
+    SectionCard("Reminders") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Inspection due & overdue tasks", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "A daily on-device check. Notifies when a structure passes its " +
+                        "inspection interval, or a high/urgent task stays open too long.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            androidx.compose.material3.Switch(checked = on, onCheckedChange = { vm.setReminders(it) })
+        }
+        OutlinedButton(onClick = { vm.checkRemindersNow() }, enabled = on) { Text("Check now") }
     }
 }
 
