@@ -1,0 +1,207 @@
+package com.asnidev.trailkeeperoffgrid.data.local
+
+import com.asnidev.trailkeeperoffgrid.model.InspectionDto
+import com.asnidev.trailkeeperoffgrid.model.InspectionFormDto
+import com.asnidev.trailkeeperoffgrid.model.JobTypeDto
+import com.asnidev.trailkeeperoffgrid.model.MessageDto
+import com.asnidev.trailkeeperoffgrid.model.NotificationDto
+import com.asnidev.trailkeeperoffgrid.model.ProjectDto
+import com.asnidev.trailkeeperoffgrid.model.ProjectMemberDto
+import com.asnidev.trailkeeperoffgrid.model.SegmentWorkDto
+import com.asnidev.trailkeeperoffgrid.model.StructureDto
+import com.asnidev.trailkeeperoffgrid.model.TrackDto
+import com.asnidev.trailkeeperoffgrid.model.TaskDto
+import com.asnidev.trailkeeperoffgrid.model.TrailDto
+import com.asnidev.trailkeeperoffgrid.model.WorkLogDto
+import com.google.gson.Gson
+
+private val gson = Gson()
+
+fun ProjectDto.toEntity() =
+    ProjectEntity(
+        id = id,
+        organisationId = organisationId,
+        name = name,
+        description = description,
+        activity = activity,
+        status = status,
+    )
+
+fun ProjectEntity.toDto() =
+    ProjectDto(
+        id = id,
+        organisationId = organisationId,
+        name = name,
+        description = description,
+        activity = activity,
+        status = status,
+    )
+
+fun TrailDto.toEntity() =
+    TrailEntity(
+        id = id,
+        organisationId = organisationId,
+        name = name,
+        activity = activity,
+        difficulty = difficulty,
+        status = status,
+        source = source,
+        lengthM = lengthM,
+        geometryJson = geometry?.toString(),
+    )
+
+fun TaskDto.toEntity() =
+    TaskEntity(
+        id = id,
+        projectId = projectId,
+        organisationId = organisationId,
+        title = title,
+        description = description,
+        taskType = taskType,
+        priority = priority,
+        status = status,
+        geometryJson = geometry?.toString(),
+        nearestTrailId = nearestTrailId,
+        estimateMin = estimateMin,
+        assigneeIdsJson = gson.toJson(assigneeIds),
+        photosJson = gson.toJson(photos),
+        updatedAt = updatedAt,
+    )
+
+fun WorkLogDto.toEntity() =
+    WorkLogEntity(
+        id = id,
+        projectId = projectId,
+        taskId = taskId,
+        trailId = trailId,
+        userId = userId,
+        minutes = minutes,
+        workedOn = workedOn,
+        note = note,
+        autoFromTask = autoFromTask,
+        updatedAt = updatedAt,
+    )
+
+fun ProjectMemberDto.toEntity(projectId: String) =
+    ProjectMemberEntity(
+        projectId = projectId,
+        userId = userId,
+        email = email,
+        name = name,
+        projectRole = projectRole,
+    )
+
+fun MessageDto.toEntity() =
+    MessageEntity(
+        id = id,
+        projectId = projectId,
+        taskId = taskId,
+        authorId = authorId,
+        body = body,
+        mentionedUserIdsJson = gson.toJson(mentionedUserIds),
+        createdAt = createdAt,
+    )
+
+fun JobTypeDto.toEntity() =
+    JobTypeEntity(
+        id = id,
+        activity = activity,
+        key = key,
+        label = label,
+        unit = unit,
+        defaultCrew = defaultCrew,
+        expectedRate = expectedRate,
+        color = color,
+        sortGroup = sortGroup,
+    )
+
+fun SegmentWorkDto.toEntity() =
+    SegmentWorkEntity(
+        id = id,
+        projectId = projectId,
+        jobTypeId = jobTypeId,
+        trailId = trailId,
+        quantity = quantity,
+        unit = unit,
+        quantitySource = quantitySource,
+        startedAt = startedAt,
+        endedAt = endedAt,
+        activeSeconds = activeSeconds,
+        crewSize = crewSize,
+        equipmentJson = gson.toJson(equipment),
+        notes = notes,
+        createdById = createdById,
+        personHours = personHours,
+        rateMinPerUnit = rateMinPerUnit,
+        vsExpectedMinPerUnit = vsExpectedMinPerUnit,
+    )
+
+fun StructureDto.toEntity() =
+    StructureEntity(
+        id = id,
+        organisationId = organisationId,
+        name = name,
+        structureType = structureType,
+        status = status,
+        geometryJson = geometry?.toString(),
+        nearestTrailId = nearestTrailId,
+        material = material,
+        color = color,
+        installedOn = installedOn,
+        inspectionIntervalDays = inspectionIntervalDays,
+        notes = notes,
+    )
+
+fun InspectionFormDto.toEntity() =
+    InspectionFormEntity(
+        id = id,
+        name = name,
+        targetType = targetType,
+        fieldsJson = gson.toJson(fields),
+        version = version,
+        isActive = isActive,
+    )
+
+fun InspectionDto.toEntity() =
+    InspectionEntity(
+        id = id,
+        projectId = projectId,
+        structureId = structureId,
+        formId = formId,
+        formVersion = formVersion,
+        inspectorId = inspectorId,
+        inspectedOn = inspectedOn,
+        answersJson = answers?.toString() ?: "{}",
+        risk = risk,
+        condition = condition,
+        notes = notes,
+    )
+
+fun TrackDto.toEntity() =
+    TrackEntity(
+        id = id,
+        projectId = projectId,
+        name = name,
+        activity = activity,
+        source = source,
+        startedAt = startedAt,
+        endedAt = endedAt,
+        movingSeconds = movingSeconds,
+        lengthM = lengthM,
+        pointCount = pointCount,
+        geometryJson = geometry?.toString(),
+        recordedById = recordedById,
+    )
+
+fun NotificationDto.toEntity() =
+    NotificationEntity(
+        id = id,
+        type = type,
+        subjectType = subjectType,
+        subjectId = subjectId,
+        projectId = projectId,
+        actorId = actorId,
+        body = body,
+        createdAt = createdAt,
+        readAt = readAt,
+    )
