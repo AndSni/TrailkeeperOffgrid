@@ -242,6 +242,20 @@ private fun BackupCard(vm: SettingsViewModel) {
         ActivityResultContracts.OpenDocument()
     ) { uri -> pendingRestore = uri }
 
+    val projects by vm.projects.collectAsState()
+    var pendingGpx by remember { mutableStateOf<android.net.Uri?>(null) }
+    val gpxExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> uri?.let(vm::exportGpx) }
+    val gpxImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            if (projects.size == 1) vm.importGpx(uri, projects.first().id)
+            else pendingGpx = uri
+        }
+    }
+
     SectionCard("Backup & restore") {
         Text(
             "Everything is on this phone only. Export a backup zip regularly " +
@@ -266,7 +280,48 @@ private fun BackupCard(vm: SettingsViewModel) {
                 enabled = !busy,
             ) { Text("Restore") }
         }
+
+        Text(
+            "GPX — hand routes and trails to another app or phone.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { gpxExportLauncher.launch("trailkeeper-offgrid-gpx.zip") },
+                enabled = !busy,
+            ) { Text("Export GPX") }
+            OutlinedButton(
+                onClick = { gpxImportLauncher.launch(arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")) },
+                enabled = !busy && projects.isNotEmpty(),
+            ) { Text("Import GPX") }
+        }
+        if (projects.isEmpty()) {
+            Text(
+                "Create a project first to import GPX into.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+
+    pendingGpx?.let { uri ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingGpx = null },
+            title = { Text("Import GPX into which project?") },
+            text = {
+                Column {
+                    projects.forEach { p ->
+                        TextButton(onClick = {
+                            vm.importGpx(uri, p.id); pendingGpx = null
+                        }) { Text(p.name) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { pendingGpx = null }) { Text("Cancel") } },
+        )
     }
 
     pendingRestore?.let { uri ->

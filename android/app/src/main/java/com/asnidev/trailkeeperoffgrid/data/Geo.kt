@@ -125,6 +125,10 @@ object Geo {
         return sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy))
     }
 
+    /** Public: [lat,lon] pairs from a GeoJSON LineString / MultiLineString. */
+    fun lineLatLon(geometryJson: String?): List<Pair<Double, Double>> =
+        geometryJson?.let { parseLineLatLon(it) } ?: emptyList()
+
     /** Pull [lat,lon] pairs out of a GeoJSON LineString / MultiLineString string. */
     private fun parseLineLatLon(geometryJson: String): List<Pair<Double, Double>> {
         val geom = runCatching { JsonParser.parseString(geometryJson).asJsonObject }.getOrNull()

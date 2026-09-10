@@ -9,6 +9,8 @@ import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 import com.asnidev.trailkeeperoffgrid.data.Reminders
+import com.asnidev.trailkeeperoffgrid.data.local.ProjectEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +61,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val lastBackup: StateFlow<String?> =
         Backup.lastBackupFlow(ctx)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val projects: StateFlow<List<ProjectEntity>> =
+        TrailkeeperDb.db.projectDao().observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -169,6 +175,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             _message.value =
                 if (r.ok) "Restored. ${r.detail}" else "Restore failed: ${r.detail}"
             refreshStorage()
+        }
+    }
+
+    fun exportGpx(dest: Uri) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            val r = Backup.exportGpxBundle(ctx, dest, Identity.displayName())
+            _busy.value = false
+            _message.value = if (r.ok) "GPX exported: ${r.detail}" else "GPX export failed: ${r.detail}"
+        }
+    }
+
+    fun importGpx(src: Uri, projectId: String) {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            val r = Backup.importGpx(ctx, src, projectId)
+            _busy.value = false
+            _message.value = if (r.ok) r.detail else "GPX import failed: ${r.detail}"
         }
     }
 

@@ -19,6 +19,7 @@ import com.asnidev.trailkeeperoffgrid.model.StructureCreateRequest
 import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import com.asnidev.trailkeeperoffgrid.model.TrackCreateRequest
 import com.asnidev.trailkeeperoffgrid.model.TrackDto
+import com.asnidev.trailkeeperoffgrid.model.TrackPointDto
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonParser
@@ -279,6 +280,7 @@ object LocalStore {
         name: String,
         activity: String,
         points: List<Pair<Double, Double>>,
+        source: String = "walked",
     ): String {
         require(points.size >= 2) { "A trail needs at least two points" }
         val id = newId()
@@ -290,7 +292,7 @@ object LocalStore {
                 activity = activity.ifBlank { "mtb" },
                 difficulty = "",
                 status = "open",
-                source = "walked",
+                source = source,
                 lengthM = Geo.lineLengthM(points),
                 geometryJson = Geo.lineStringJson(points),
             )
@@ -550,6 +552,16 @@ object LocalStore {
             geometry = geometry?.let { JsonParser.parseString(it) },
             recordedById = entity.recordedById,
         )
+    }
+
+    /** The full recorded point list for a track (lat/lon/ele/time), read from
+     * the on-disk sidecar `saveTrack` wrote. Empty for imported/older tracks. */
+    fun trackPoints(id: String): List<TrackPointDto> {
+        val f = File(File(appContext.getExternalFilesDir(null), "tracks"), "$id.json")
+        if (!f.exists()) return emptyList()
+        return runCatching {
+            gson.fromJson(f.readText(), Array<TrackPointDto>::class.java).toList()
+        }.getOrDefault(emptyList())
     }
 
     suspend fun deleteTrack(id: String) {
