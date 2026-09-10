@@ -1,5 +1,7 @@
 package com.asnidev.trailkeeperoffgrid.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -78,6 +80,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
             item { ProfileCard(vm) }
             item { OfflineMapsCard(vm) }
             item { RemindersCard(vm) }
+            item { BackupCard(vm) }
             item { StorageCard(vm) }
             item { AboutCard() }
         }
@@ -221,6 +224,75 @@ private fun StorageRow(label: String, bytes: Long, bold: Boolean = false) {
             humanBytes(bytes),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun BackupCard(vm: SettingsViewModel) {
+    val last by vm.lastBackup.collectAsState()
+    val busy by vm.busy.collectAsState()
+    var pendingRestore by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> uri?.let(vm::exportBackup) }
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> pendingRestore = uri }
+
+    SectionCard("Backup & restore") {
+        Text(
+            "Everything is on this phone only. Export a backup zip regularly " +
+                "(data + photos) and keep it somewhere safe — it is also how you " +
+                "move to a new phone.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Last backup: " + (last?.take(10) ?: "never"),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (last == null) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { exportLauncher.launch("trailkeeper-offgrid-backup.zip") },
+                enabled = !busy,
+            ) { Text("Export backup") }
+            OutlinedButton(
+                onClick = { restoreLauncher.launch(arrayOf("application/zip", "*/*")) },
+                enabled = !busy,
+            ) { Text("Restore") }
+        }
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+
+    pendingRestore?.let { uri ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingRestore = null },
+            title = { Text("Restore backup") },
+            text = {
+                Text(
+                    "“Merge” adds/updates rows from the backup and keeps what you " +
+                        "have. “Replace” wipes this app's data first. Photos are " +
+                        "restored either way.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.restoreBackup(uri, replace = false); pendingRestore = null
+                }) { Text("Merge") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        vm.restoreBackup(uri, replace = true); pendingRestore = null
+                    }) { Text("Replace") }
+                    TextButton(onClick = { pendingRestore = null }) { Text("Cancel") }
+                }
+            },
         )
     }
 }
