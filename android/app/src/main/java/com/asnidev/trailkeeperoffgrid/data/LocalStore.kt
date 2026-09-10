@@ -561,6 +561,32 @@ object LocalStore {
         }
     }
 
+    // ---- storage readout (Settings) ----------------------------------
+
+    data class Storage(val dbBytes: Long, val photoBytes: Long, val trackBytes: Long) {
+        val total get() = dbBytes + photoBytes + trackBytes
+    }
+
+    fun storage(): Storage = Storage(
+        dbBytes = dbFileBytes(),
+        photoBytes = dirBytes(File(appContext.getExternalFilesDir(null), "photos")),
+        trackBytes = dirBytes(File(appContext.getExternalFilesDir(null), "tracks")),
+    )
+
+    private fun dbFileBytes(): Long {
+        val f = appContext.getDatabasePath("trailkeeper_offgrid.db") ?: return 0
+        var total = f.length()
+        // WAL + SHM alongside it.
+        listOf("-wal", "-shm").forEach { suffix ->
+            File(f.path + suffix).let { if (it.exists()) total += it.length() }
+        }
+        return total
+    }
+
+    private fun dirBytes(dir: File): Long =
+        if (!dir.exists()) 0L
+        else dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+
     // ---- first-run seed + wipe -----------------------------------
 
     /** Insert the default job types the first time the table is empty. */

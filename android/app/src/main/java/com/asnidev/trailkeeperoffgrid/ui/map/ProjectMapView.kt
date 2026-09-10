@@ -32,7 +32,7 @@ import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 
-private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private val STYLE_URL get() = com.asnidev.trailkeeperoffgrid.ui.map.MapStyle.URL
 private const val TRAIL_SRC = "tk-trails"
 private const val TRACK_SRC = "tk-tracks"
 private const val TASK_SRC = "tk-tasks"

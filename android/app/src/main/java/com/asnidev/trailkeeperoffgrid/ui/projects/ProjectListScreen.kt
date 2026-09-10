@@ -12,7 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -47,6 +47,7 @@ import com.asnidev.trailkeeperoffgrid.data.NotificationRepository
 fun ProjectListScreen(
     onOpenProject: (id: String, name: String) -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenSettings: () -> Unit,
     vm: ProjectListViewModel = viewModel(),
 ) {
     val s by vm.state.collectAsState()
@@ -64,6 +65,9 @@ fun ProjectListScreen(
                         BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
                             Icon(Icons.Default.Notifications, contentDescription = "Notifications")
                         }
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
             )

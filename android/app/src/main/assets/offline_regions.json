@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "note": "Named areas offered in Settings -> Offline maps. bbox is [west, south, east, north]. Downloaded via MapLibre OfflineManager from the shared style; see data/OfflineMaps.kt.",
+  "regions": [
+    { "id": "riga_vidzeme", "name": "Riga & Vidzeme", "bbox": [23.6, 56.7, 26.4, 57.9] },
+    { "id": "latvia", "name": "Latvia", "bbox": [20.6, 55.6, 28.3, 58.1] },
+    { "id": "baltics", "name": "Baltics (EE + LV + LT)", "bbox": [20.6, 53.8, 28.3, 59.7] }
+  ]
+}
