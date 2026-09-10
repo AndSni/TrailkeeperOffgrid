@@ -119,6 +119,9 @@ interface StructureDao {
 
     @Query("SELECT * FROM structures WHERE id = :id") suspend fun getById(id: String): StructureEntity?
 
+    @Query("SELECT * FROM structures WHERE organisationId = :orgId")
+    suspend fun listForOrg(orgId: String): List<StructureEntity>
+
     @Query("DELETE FROM structures WHERE id = :id") suspend fun deleteById(id: String)
 }
 
@@ -145,6 +148,8 @@ interface InspectionDao {
 
     @Query("SELECT * FROM inspections WHERE projectId = :projectId ORDER BY inspectedOn DESC")
     fun observeForProject(projectId: String): Flow<List<InspectionEntity>>
+
+    @Query("SELECT * FROM inspections") suspend fun listAll(): List<InspectionEntity>
 
     @Query("DELETE FROM inspections WHERE id = :id") suspend fun deleteById(id: String)
 
