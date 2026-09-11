@@ -243,6 +243,7 @@ fun ProjectMap(
             },
         )
         if (mapUnavailable) {
+            WorldOutlineBackdrop(Modifier.fillMaxSize())
             Surface(
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
                 color = MaterialTheme.colorScheme.surface,

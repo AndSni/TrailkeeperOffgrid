@@ -179,6 +179,7 @@ private fun MeasureMapView(
             update = { styleHolder[0]?.let { pushMeasure(it, points, area) } },
         )
         if (mapUnavailable) {
+            com.asnidev.trailkeeperoffgrid.ui.map.WorldOutlineBackdrop(Modifier.fillMaxSize())
             Surface(
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
                 color = MaterialTheme.colorScheme.surface,
