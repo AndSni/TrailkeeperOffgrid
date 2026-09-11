@@ -363,7 +363,8 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
         val trail = if (kind == "trail") s.trails.firstOrNull { it.id == id } else null
         val structure = if (kind == "structure") structures.firstOrNull { it.id == id } else null
         val track = if (kind == "track") tracks.firstOrNull { it.id == id } else null
-        if (task == null && trail == null && structure == null && track == null) {
+        val report = if (kind == "report") reports.firstOrNull { it.id == id } else null
+        if (task == null && trail == null && structure == null && track == null && report == null) {
             selected = null
         } else {
             ModalBottomSheet(onDismissRequest = { selected = null }) {
@@ -419,6 +420,15 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                                 Text("Show on map")
                             }
                         }
+                        report != null ->
+                            ReportDetailBody(
+                                report = report,
+                                onShowOnMap = { focusOnMap(report.geometryJson); selected = null },
+                                onToggleResolved = { vm.setReportResolved(report.id, report.resolvedAt == null) },
+                                onDelete = { vm.deleteTrailReport(report.id); selected = null },
+                                onUploadPhoto = { file -> vm.uploadReportPhoto(report.id, file) },
+                                onDeletePhoto = { photoId -> vm.deleteReportPhoto(report.id, photoId) },
+                            )
                     }
                 }
             }
@@ -576,6 +586,77 @@ private fun StructureDetailBody(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete structure?") },
             text = { Text("\"${structure.name}\" and its inspections will be removed.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReportDetailBody(
+    report: com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity,
+    onShowOnMap: () -> Unit,
+    onToggleResolved: () -> Unit,
+    onDelete: () -> Unit,
+    onUploadPhoto: (java.io.File) -> Unit,
+    onDeletePhoto: (String) -> Unit,
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    var viewingPhoto by remember { mutableStateOf<String?>(null) }
+    val resolved = report.resolvedAt != null
+    val accent = when (report.status) {
+        "passable" -> Color(0xFF4C6B3C)
+        "caution" -> Color(0xFFD6A64B)
+        else -> Color(0xFFB23B3B)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(color = accent, shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)) {
+            Text(
+                report.status.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+        Text(
+            "${com.asnidev.trailkeeperoffgrid.data.TrailReports.label(report.kind)} · ${report.severity}",
+            style = MaterialTheme.typography.titleLarge,
+        )
+    }
+    Text(
+        report.createdAt.take(10) + if (resolved) " · resolved" else "",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (report.note.isNotBlank()) Text(report.note, style = MaterialTheme.typography.bodyMedium)
+    com.asnidev.trailkeeperoffgrid.data.Coordinates.pointFromGeoJson(report.geometryJson)?.let { (lat, lon) ->
+        com.asnidev.trailkeeperoffgrid.ui.common.CoordinatesRow(lat, lon)
+    }
+    TaskPhotoStrip(
+        photosJson = report.photosJson,
+        onUpload = onUploadPhoto,
+        onDelete = onDeletePhoto,
+        onOpen = { viewingPhoto = it },
+    )
+    viewingPhoto?.let { url -> PhotoViewerDialog(url = url, onClose = { viewingPhoto = null }) }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = onToggleResolved) { Text(if (resolved) "Reopen" else "Mark resolved") }
+        if (report.geometryJson != null) OutlinedButton(onClick = onShowOnMap) { Text("Show on map") }
+        Button(
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            ),
+            onClick = { confirmDelete = true },
+        ) { Text("Delete") }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete this report?") },
+            text = { Text("${com.asnidev.trailkeeperoffgrid.data.TrailReports.label(report.kind)} · ${report.status}") },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
             },
