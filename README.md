@@ -22,7 +22,9 @@ Installs alongside Trailkeeper (`applicationId com.asnidev.trailkeeperoffgrid`).
 
 ## Status
 
-All of P0, P1, P4 and P5 are done; P2 and P3 are substantially done.
+**v0.2.0** — real visual identity: an adaptive app icon and a branded 2s
+launch splash (see `branding/`). All of P0, P1, P4 and P5 are done; P2 and
+P3 are substantially done.
 
 | Phase | State |
 |-------|-------|
