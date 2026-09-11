@@ -3,6 +3,7 @@ package com.asnidev.trailkeeperoffgrid.ui.common
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -63,10 +66,13 @@ fun PointPickerScreen(
     val styleHolder = remember { arrayOfNulls<Style>(1) }
     val pointHolder = remember { arrayOfNulls<Pair<Double, Double>>(1) }
     pointHolder[0] = point
+    // See ui/map/ProjectMapView.kt's `mapUnavailable` for the semantics.
+    var mapUnavailable by remember { mutableStateOf(false) }
 
     val mapView = remember {
         MapView(context).apply {
             onCreate(null)
+            addOnDidFailLoadingMapListener { if (styleHolder[0] == null) mapUnavailable = true }
             getMapAsync { map ->
                 val start = initial ?: (56.95 to 24.6)
                 map.cameraPosition =
@@ -76,6 +82,7 @@ fun PointPickerScreen(
                         .build()
                 map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                     styleHolder[0] = style
+                    mapUnavailable = false
                     style.addSource(GeoJsonSource(SRC))
                     style.addLayer(
                         CircleLayer("$SRC-c", SRC).withProperties(
@@ -154,9 +161,26 @@ fun PointPickerScreen(
                 }
             }
         }
-        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize(), update = {
-            styleHolder[0]?.let { pushPoint(it, pointHolder[0]) }
-        })
+        Box(Modifier.fillMaxSize()) {
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize(), update = {
+                styleHolder[0]?.let { pushPoint(it, pointHolder[0]) }
+            })
+            if (mapUnavailable) {
+                Surface(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                ) {
+                    Text(
+                        "No map for this area yet.\nConnect once and download a region in " +
+                            "Settings → Offline maps, then it works with no signal.",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
     }
 }
 

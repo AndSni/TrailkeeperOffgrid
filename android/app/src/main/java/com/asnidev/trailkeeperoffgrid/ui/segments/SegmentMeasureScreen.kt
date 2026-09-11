@@ -2,6 +2,7 @@ package com.asnidev.trailkeeperoffgrid.ui.segments
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +19,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -110,14 +113,18 @@ private fun MeasureMapView(
     val styleHolder = remember { arrayOfNulls<Style>(1) }
     val onAddState = remember { arrayOfNulls<(Double, Double) -> Unit>(1) }
     onAddState[0] = onAdd
+    // See ui/map/ProjectMapView.kt's `mapUnavailable` for the semantics.
+    var mapUnavailable by remember { mutableStateOf(false) }
 
     val mapView = remember {
         MapView(context).apply {
             onCreate(null)
+            addOnDidFailLoadingMapListener { if (styleHolder[0] == null) mapUnavailable = true }
             getMapAsync { map ->
                 map.cameraPosition = CameraPosition.Builder().target(LatLng(56.95, 24.6)).zoom(6.0).build()
                 map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                     styleHolder[0] = style
+                    mapUnavailable = false
                     style.addSource(GeoJsonSource(LINE_SRC))
                     style.addSource(GeoJsonSource(PT_SRC))
                     style.addLayer(
@@ -165,11 +172,28 @@ private fun MeasureMapView(
         }
     }
 
-    AndroidView(
-        factory = { mapView },
-        modifier = modifier,
-        update = { styleHolder[0]?.let { pushMeasure(it, points, area) } },
-    )
+    Box(modifier) {
+        AndroidView(
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize(),
+            update = { styleHolder[0]?.let { pushMeasure(it, points, area) } },
+        )
+        if (mapUnavailable) {
+            Surface(
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+            ) {
+                Text(
+                    "No map for this area yet.\nConnect once and download a region in " +
+                        "Settings → Offline maps, then it works with no signal.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
 }
 
 private fun pushMeasure(style: Style, points: List<Pair<Double, Double>>, area: Boolean) {

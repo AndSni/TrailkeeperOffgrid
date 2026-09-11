@@ -2,11 +2,22 @@ package com.asnidev.trailkeeperoffgrid.ui.map
 
 import android.annotation.SuppressLint
 import android.graphics.PointF
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -75,9 +86,18 @@ fun ProjectMap(
     val onTapHolder = remember { arrayOfNulls<(String, String) -> Unit>(1) }
     onTapHolder[0] = onFeatureTap
 
+    // Set once the style has genuinely failed to load and never succeeded
+    // before (no signal yet, and no offline region has ever been downloaded
+    // for any area). Cleared for good the first time a style loads — after
+    // that, MapLibre's own offline store serves any previously-downloaded
+    // area with no network, so a later failure outside that area correctly
+    // just renders a blank map there instead of this message.
+    var mapUnavailable by remember { mutableStateOf(false) }
+
     val mapView = remember {
         MapView(context).apply {
             onCreate(null)
+            addOnDidFailLoadingMapListener { if (holder.style == null) mapUnavailable = true }
             getMapAsync { map ->
                 holder.map = map
                 map.cameraPosition = CameraPosition.Builder().target(LATVIA).zoom(6.0).build()
@@ -104,6 +124,7 @@ fun ProjectMap(
                 }
                 map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                     holder.style = style
+                    mapUnavailable = false
                     style.addSource(GeoJsonSource(TRAIL_SRC))
                     style.addSource(GeoJsonSource(TRACK_SRC))
                     style.addSource(GeoJsonSource(TASK_SRC))
@@ -203,23 +224,40 @@ fun ProjectMap(
         }
     }
 
-    AndroidView(
-        factory = { mapView },
-        modifier = modifier,
-        update = {
-            pushData(
-                holder, trails, tasks, structures, tracks, reports,
-                projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
-            )
-            if (focus != null && focus.third != holder.lastFocusNonce) {
-                holder.lastFocusNonce = focus.third
-                holder.map?.easeCamera(
-                    CameraUpdateFactory.newLatLngZoom(LatLng(focus.first, focus.second), 16.0),
-                    600,
+    Box(modifier) {
+        AndroidView(
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize(),
+            update = {
+                pushData(
+                    holder, trails, tasks, structures, tracks, reports,
+                    projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
+                )
+                if (focus != null && focus.third != holder.lastFocusNonce) {
+                    holder.lastFocusNonce = focus.third
+                    holder.map?.easeCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(focus.first, focus.second), 16.0),
+                        600,
+                    )
+                }
+            },
+        )
+        if (mapUnavailable) {
+            Surface(
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+            ) {
+                Text(
+                    "No map for this area yet.\nConnect once and download a region in " +
+                        "Settings → Offline maps, then it works with no signal.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
-        },
-    )
+        }
+    }
 }
 
 private fun pushData(
