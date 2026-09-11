@@ -46,7 +46,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         Identity.displayNameFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Identity.rawDisplayName())
 
-    val presets = MutableStateFlow<List<OfflineMaps.Preset>>(emptyList())
+    val quickPresets = MutableStateFlow<List<OfflineMaps.Preset>>(emptyList())
+    val countries = MutableStateFlow<List<OfflineMaps.Preset>>(emptyList())
     val downloadedRegions = MutableStateFlow<List<OfflineMaps.DownloadedRegion>>(emptyList())
 
     /** preset id -> live download state */
@@ -73,7 +74,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
     init {
-        viewModelScope.launch { presets.value = OfflineMaps.presets(ctx) }
+        viewModelScope.launch {
+            quickPresets.value = OfflineMaps.quickPresets(ctx)
+            countries.value = OfflineMaps.countries(ctx)
+        }
         refreshRegions()
         refreshStorage()
     }
