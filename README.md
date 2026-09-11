@@ -25,13 +25,13 @@ already use on Play; the internal code package stays
 
 ## Status
 
-**v0.2.1** — fixes a crash: a project whose only geo-tagged item was a
-single task (e.g. right after adding its first task) threw
-`InvalidLatLngBoundsException` on every attempt to open it, since MapLibre's
-`LatLngBounds.Builder` refuses fewer than 2 points; `MapGeo` now builds a
-degenerate single-point bounds by hand instead. GPX import is now reachable
-directly from the Route and Trails tabs (scoped to the open project), not
-just Settings. Also a simpler, bolder app icon.
+**v0.2.2** — updated app icon (refined skull glyph). v0.2.1 fixed a crash:
+a project whose only geo-tagged item was a single task (e.g. right after
+adding its first task) threw `InvalidLatLngBoundsException` on every
+attempt to open it, since MapLibre's `LatLngBounds.Builder` refuses fewer
+than 2 points; `MapGeo` now builds a degenerate single-point bounds by hand
+instead. GPX import is now reachable directly from the Route and Trails
+tabs (scoped to the open project), not just Settings.
 
 All of P0, P1, P4 and P5 are done; P2 and P3 are substantially done.
 
