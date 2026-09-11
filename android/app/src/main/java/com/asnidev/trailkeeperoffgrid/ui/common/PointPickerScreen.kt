@@ -166,6 +166,7 @@ fun PointPickerScreen(
                 styleHolder[0]?.let { pushPoint(it, pointHolder[0]) }
             })
             if (mapUnavailable) {
+                com.asnidev.trailkeeperoffgrid.ui.map.WorldOutlineBackdrop(Modifier.fillMaxSize())
                 Surface(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     color = MaterialTheme.colorScheme.surface,
