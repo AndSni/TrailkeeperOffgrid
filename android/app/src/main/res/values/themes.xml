@@ -1,3 +1,9 @@
 <resources>
-    <style name="Theme.TrailkeeperOffgrid" parent="android:Theme.Material.NoActionBar" />
+    <!-- windowBackground is the very first pixels drawn, before Compose has
+         even initialized - matching it to the splash/app background means
+         there's no white/default flash before the splash Image composable
+         takes over. See MainActivity/TrailkeeperApp's splash handling. -->
+    <style name="Theme.TrailkeeperOffgrid" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
 </resources>
