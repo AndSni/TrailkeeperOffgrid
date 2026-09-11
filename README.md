@@ -25,7 +25,14 @@ already use on Play; the internal code package stays
 
 ## Status
 
-**v0.2.2** — updated app icon (refined skull glyph). v0.2.1 fixed a crash:
+**v0.2.3** — fixes the launcher icon: v0.2.2 shipped it over-cropped and
+scaled ~1.8x too large (the generator discarded the source art's own
+padding and re-scaled to a fixed 62% fraction instead of respecting the
+template-calibrated scale already in `appicon.png`), so it looked
+zoomed-in and clipped by circular/squircle launcher masks. Fixed by
+resizing the source canvas as-is — see `branding/README.md`.
+
+v0.2.1 fixed a crash:
 a project whose only geo-tagged item was a single task (e.g. right after
 adding its first task) threw `InvalidLatLngBoundsException` on every
 attempt to open it, since MapLibre's `LatLngBounds.Builder` refuses fewer
