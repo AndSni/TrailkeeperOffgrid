@@ -40,6 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.rotate
+import com.asnidev.trailkeeperoffgrid.data.Geo
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.TrailReports
@@ -49,6 +54,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.ui.projects.PhotoViewerDialog
 import com.asnidev.trailkeeperoffgrid.ui.projects.TaskPhotoStrip
 import com.asnidev.trailkeeperoffgrid.record.RecPhase
+import com.asnidev.trailkeeperoffgrid.record.RecPoint
 import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
 import com.asnidev.trailkeeperoffgrid.record.TrackRecordingService
 import com.google.android.gms.location.LocationServices
@@ -117,6 +123,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                TrackBackRow(rec.points)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (rec.phase == RecPhase.RECORDING) {
                                         OutlinedButton(onClick = { TrackRecordingService.pause(context) }) { Text("Pause") }
@@ -269,8 +276,41 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
     }
 }
 
+/** While a route is being recorded, [TrackRecorder] already receives a live
+ * GPS fix every couple of seconds — its last point IS the current position,
+ * so "track back to the start" is just the distance/bearing from the last
+ * point to the first, recomputed on every new fix. No extra location
+ * plumbing needed. */
+@Composable
+private fun TrackBackRow(points: List<RecPoint>) {
+    val start = points.firstOrNull() ?: return
+    val here = points.lastOrNull() ?: return
+    if (start === here) return
+    val distance = Geo.haversineM(here.lat, here.lon, start.lat, start.lon)
+    if (distance < 3) return // at the start already
+    val bearing = Geo.bearingDeg(here.lat, here.lon, start.lat, start.lon)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(
+            Icons.Filled.ArrowUpward,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp).rotate(bearing.toFloat()),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            "Track back: ${fmtKm(distance)} · ${Geo.cardinal(bearing)} (${bearing.toInt()}°) to start",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
 @Composable
 private fun TrackCard(t: TrackEntity) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var backInfo by remember(t.id) { mutableStateOf<String?>(null) }
+    var checking by remember(t.id) { mutableStateOf(false) }
+
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,6 +323,30 @@ private fun TrackCard(t: TrackEntity) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            backInfo?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            TextButton(
+                enabled = !checking,
+                onClick = {
+                    checking = true
+                    scope.launch {
+                        val start = LocalStore.trackPoints(t.id).firstOrNull()?.let { it.lat to it.lon }
+                            ?: Geo.lineLatLon(t.geometryJson).firstOrNull()
+                        val loc = lastLocation(context)
+                        backInfo = when {
+                            start == null -> "No start point saved for this route."
+                            loc == null -> "No GPS fix yet — try again in a moment."
+                            else -> {
+                                val d = Geo.haversineM(loc.latitude, loc.longitude, start.first, start.second)
+                                val b = Geo.bearingDeg(loc.latitude, loc.longitude, start.first, start.second)
+                                "${fmtKm(d)} · ${Geo.cardinal(b)} (${b.toInt()}°) to this route's start"
+                            }
+                        }
+                        checking = false
+                    }
+                },
+            ) { Text(if (checking) "Checking…" else "Bearing to start") }
         }
     }
 }

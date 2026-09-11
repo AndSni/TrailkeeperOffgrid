@@ -31,6 +31,32 @@ object Geo {
         return EARTH_R * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
+    /** Great-circle initial bearing from point 1 to point 2, degrees
+     * clockwise from true north, in [0, 360). Spherical approximation —
+     * same model as [haversineM] — which is within a fraction of a degree
+     * of the WGS-84 ellipsoidal value at track-back distances (checked
+     * against `pyproj.Geod` before porting). */
+    fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val phi1 = Math.toRadians(lat1)
+        val phi2 = Math.toRadians(lat2)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val y = sin(dLon) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLon)
+        val theta = atan2(y, x)
+        return (Math.toDegrees(theta) + 360) % 360
+    }
+
+    private val COMPASS_POINTS = listOf(
+        "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    )
+
+    /** 16-point compass label for a bearing in degrees. */
+    fun cardinal(bearingDeg: Double): String {
+        val idx = (((bearingDeg % 360) + 360) % 360 / 22.5 + 0.5).toInt() % 16
+        return COMPASS_POINTS[idx]
+    }
+
     /** Length of a polyline given as [lat,lon] pairs, in metres. */
     fun lineLengthM(points: List<Pair<Double, Double>>): Double {
         var m = 0.0
