@@ -10,11 +10,16 @@ regenerate with the recipes below if the art changes.
 
 ## App icon
 
-`appicon.png` is grayscale (R=G=B everywhere) white-on-black, so the
-foreground is built with a luminance-as-alpha cutout (white → opaque,
-black → transparent), cropped to the logo's content box, then centered at
-~62% of a 108dp adaptive-icon canvas (inside the ~66dp safe zone so
-circular/squircle launcher masks don't clip it) at all 5 densities:
+`appicon.png` is grayscale (R=G=B everywhere) white-on-black, drawn at
+512×512 **already scaled and padded to Android's adaptive-icon keyline
+template** (glyph inscribed in the template's inner safe circle, so it
+survives every launcher mask). The foreground is built with a
+luminance-as-alpha cutout (white → opaque, black → transparent) and a
+straight resize of the *whole* 512×512 canvas to each density — no
+re-cropping and no re-scaling to some other fraction, since that would
+throw away the padding already calibrated against the template and
+zoom the glyph in past the safe zone (this happened once — v0.2.2 shipped
+an over-cropped, over-scaled icon; fixed same day):
 
 ```python
 from PIL import Image
@@ -25,22 +30,15 @@ lum = np.array(im)[:, :, 0]  # R channel; image is grayscale
 cutout = np.zeros((*lum.shape, 4), dtype=np.uint8)
 cutout[:, :, :3] = 255
 cutout[:, :, 3] = lum
-logo = Image.fromarray(cutout, "RGBA")
-logo = logo.crop(logo.getbbox())  # tight crop to content
-
-def foreground(canvas_px, safe_frac=0.62):
-    canvas = Image.new("RGBA", (canvas_px, canvas_px), (0, 0, 0, 0))
-    scale = int(canvas_px * safe_frac) / max(logo.size)
-    resized = logo.resize([round(d * scale) for d in logo.size], Image.LANCZOS)
-    pos = tuple((canvas_px - d) // 2 for d in resized.size)
-    canvas.paste(resized, pos, resized)
-    return canvas
+logo = Image.fromarray(cutout, "RGBA")  # full 512x512 canvas, padding as authored
 
 for folder, px in {
     "mipmap-mdpi": 108, "mipmap-hdpi": 162, "mipmap-xhdpi": 216,
     "mipmap-xxhdpi": 324, "mipmap-xxxhdpi": 432,
 }.items():
-    foreground(px).save(f"android/app/src/main/res/{folder}/ic_launcher_foreground.png")
+    logo.resize((px, px), Image.LANCZOS).save(
+        f"android/app/src/main/res/{folder}/ic_launcher_foreground.png"
+    )
 ```
 
 `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` pairs that
