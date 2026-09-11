@@ -46,6 +46,8 @@ import com.asnidev.trailkeeperoffgrid.data.TrailReports
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
+import com.asnidev.trailkeeperoffgrid.ui.projects.PhotoViewerDialog
+import com.asnidev.trailkeeperoffgrid.ui.projects.TaskPhotoStrip
 import com.asnidev.trailkeeperoffgrid.record.RecPhase
 import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
 import com.asnidev.trailkeeperoffgrid.record.TrackRecordingService
@@ -321,6 +323,8 @@ private fun ReportCard(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    var viewingPhoto by remember { mutableStateOf<String?>(null) }
     val resolved = r.resolvedAt != null
     val accent = when (r.status) {
         "passable" -> Color(0xFF4C6B3C)
@@ -351,6 +355,13 @@ private fun ReportCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TaskPhotoStrip(
+                photosJson = r.photosJson,
+                onUpload = { file -> scope.launch { LocalStore.addReportPhoto(r.id, file) } },
+                onDelete = { photoId -> scope.launch { LocalStore.deleteReportPhoto(r.id, photoId) } },
+                onOpen = { viewingPhoto = it },
+            )
+            viewingPhoto?.let { url -> PhotoViewerDialog(url = url, onClose = { viewingPhoto = null }) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onToggle) { Text(if (resolved) "Reopen" else "Mark resolved") }
                 TextButton(onClick = onDelete) { Text("Delete") }

@@ -396,7 +396,77 @@ object LocalStore {
         db.trailReportDao().upsert(r.copy(resolvedAt = if (resolved) nowIso() else null))
     }
 
-    suspend fun deleteTrailReport(id: String) = db.trailReportDao().deleteById(id)
+    suspend fun deleteTrailReport(id: String) {
+        db.trailReportDao().deleteById(id)
+        deleteReportPhotoFiles(id)
+    }
+
+    // ---- report photos (local files) -------------------------------
+
+    private fun reportPhotoDir(reportId: String): File =
+        File(photosRoot(), "report-$reportId").apply { mkdirs() }
+
+    /** Same shape as [addTaskPhoto], for a trail-condition report. */
+    suspend fun addReportPhoto(reportId: String, jpeg: File, caption: String = ""): Unit =
+        withContext(Dispatchers.IO) {
+            val r = db.trailReportDao().getById(reportId) ?: return@withContext
+            val photoId = newId()
+            val dest = File(reportPhotoDir(reportId), "$photoId.jpg")
+            jpeg.copyTo(dest, overwrite = true)
+            jpeg.delete()
+            val arr = JsonParser.parseString(r.photosJson.ifBlank { "[]" }).asJsonArray
+            val obj = com.google.gson.JsonObject().apply {
+                addProperty("id", photoId)
+                addProperty("caption", caption)
+                addProperty("url", dest.absolutePath)
+            }
+            arr.add(obj)
+            db.trailReportDao().upsert(r.copy(photosJson = arr.toString()))
+        }
+
+    suspend fun deleteReportPhoto(reportId: String, photoId: String): Unit =
+        withContext(Dispatchers.IO) {
+            val r = db.trailReportDao().getById(reportId) ?: return@withContext
+            val arr = JsonParser.parseString(r.photosJson.ifBlank { "[]" }).asJsonArray
+            val kept = com.google.gson.JsonArray()
+            arr.forEach { el ->
+                val o = el.asJsonObject
+                if (o.get("id")?.asString == photoId) {
+                    o.get("url")?.asString?.let { runCatching { File(it).delete() } }
+                } else {
+                    kept.add(o)
+                }
+            }
+            db.trailReportDao().upsert(r.copy(photosJson = kept.toString()))
+        }
+
+    private fun deleteReportPhotoFiles(reportId: String) {
+        runCatching { reportPhotoDir(reportId).deleteRecursively() }
+    }
+
+    /** Settings → "clear photos of resolved reports": same deal as
+     * [purgeDoneTaskPhotos] but for resolved trail-condition reports. */
+    suspend fun purgeResolvedReportPhotos(): Triple<Int, Int, Long> =
+        withContext(Dispatchers.IO) {
+            var reports = 0
+            var files = 0
+            var bytes = 0L
+            for (r in db.backupDao().trailReports().filter { it.resolvedAt != null }) {
+                val arr = runCatching {
+                    JsonParser.parseString(r.photosJson.ifBlank { "[]" }).asJsonArray
+                }.getOrNull() ?: continue
+                if (arr.size() == 0) continue
+                arr.forEach { el ->
+                    el.asJsonObject.get("url")?.asString?.let { path ->
+                        val f = File(path)
+                        if (f.exists()) { bytes += f.length(); if (f.delete()) files++ }
+                    }
+                }
+                db.trailReportDao().upsert(r.copy(photosJson = "[]"))
+                reports++
+            }
+            Triple(reports, files, bytes)
+        }
 
     // ---- inspections -----------------------------------------------
 

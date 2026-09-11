@@ -461,7 +461,7 @@ private fun TaskDetailBody(
     )
     if (task.description.isNotBlank()) Text(task.description, style = MaterialTheme.typography.bodyMedium)
     TaskPhotoStrip(
-        task = task,
+        photosJson = task.photosJson,
         onUpload = onUploadPhoto,
         onDelete = onDeletePhoto,
         onOpen = { viewingPhoto = it },

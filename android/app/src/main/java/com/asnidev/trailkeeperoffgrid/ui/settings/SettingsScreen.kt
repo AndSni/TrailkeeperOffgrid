@@ -208,6 +208,10 @@ private fun StorageCard(vm: SettingsViewModel) {
             if (busy) CircularProgressIndicator(Modifier.width(16.dp))
             else Text("Clear photos of completed tasks")
         }
+        OutlinedButton(onClick = { vm.purgeResolvedReportPhotos() }, enabled = !busy) {
+            if (busy) CircularProgressIndicator(Modifier.width(16.dp))
+            else Text("Clear photos of resolved reports")
+        }
     }
 }
 
