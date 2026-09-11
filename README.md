@@ -28,8 +28,8 @@ Installs alongside Trailkeeper (`applicationId com.asnidev.trailkeeperoffgrid`).
 | **P1 — de-server the data layer** | ✅ auth + network + sync removed; Room is the source of truth; on-device length/area/nearest-trail/rollups; opens straight to the project list |
 | **P2 — offline maps** | ◐ Settings → Offline maps: pick a region (Rīga & Vidzeme / Latvia / Baltics), download it to phone storage via MapLibre's offline store, progress, delete, storage readout. Vendored self-contained style + `pmtiles://` local file still to come. |
 | **P3 — settings: username, DB cleanup, backup/restore** | ◐ Settings: optional display name, "Clear photos of completed tasks", storage breakdown, **full-workspace backup/restore zip** (data + GeoJSON + photos; merge or replace). GPX import/export still to come. |
-| **P4 — off-grid field features** | ◐ **local reminders** (inspection-due / task-overdue, WorkManager → notification inbox). Track-back and multi-format coordinates still to come. |
-| **P5 — trail condition reporting** | ✅ `trail_reports` entity (status / kind / severity / note / GPS), logged from the Route tab, shown as a coloured map layer, resolve/reopen/delete. First Room migration (v1→v2); both schema JSONs committed, migration DDL verified against the exported `createSql`. |
+| **P4 — off-grid field features** | ◐ local reminders (inspection-due / task-overdue → notification inbox) · **multi-format coordinates** (decimal / DMS / UTM, copy-to-clipboard, on tasks/structures/reports). Track-back still to come. |
+| **P5 — trail condition reporting** | ✅ `trail_reports` entity (status / kind / severity / note / GPS / photos), logged from the Route tab, shown as a coloured map layer, resolve/reopen/delete, a matching "clear resolved report photos" cleanup action. First Room migration (v1→v2); both schema JSONs committed, migration DDL verified against the exported `createSql`. |
 
 Bumped to MapLibre 11.8 (has `pmtiles://` support for the next map step).
 The map tab still points at an online style, but any region you download in
