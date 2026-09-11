@@ -25,7 +25,7 @@ already use on Play; the internal code package stays
 
 ## Status
 
-**v0.2.4** — larger app icon glyph (re-saved source art, same 1:1
+**v0.2.5** — refined app icon glyph (re-saved source art, same 1:1
 resize pipeline). v0.2.3 fixed the launcher icon: v0.2.2 shipped it over-cropped and
 scaled ~1.8x too large (the generator discarded the source art's own
 padding and re-scaled to a fixed 62% fraction instead of respecting the
