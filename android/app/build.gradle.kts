@@ -22,7 +22,12 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.asnidev.trailkeeperoffgrid"
+        // Public/Play identity — matches the com.<name>.app convention
+        // SharpRight (com.sharpright.app) and XCMr (com.xcmr.app) already
+        // use, dropping the "asnidev" dev-namespace prefix. Deliberately
+        // NOT the same as `namespace` above (that stays the internal code
+        // package - Kotlin sources are untouched by this).
+        applicationId = "com.trailkeeperoffgrid.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 2

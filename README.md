@@ -18,7 +18,10 @@ No Play Store. Download the APK and open it (allow "install unknown apps"):
 - **Latest:** <https://github.com/AndSni/TrailkeeperOffgrid/raw/main/dist/TrailkeeperOffgrid.apk>
 - **Release page:** <https://github.com/AndSni/TrailkeeperOffgrid/releases/latest/download/TrailkeeperOffgrid.apk>
 
-Installs alongside Trailkeeper (`applicationId com.asnidev.trailkeeperoffgrid`).
+`applicationId com.trailkeeperoffgrid.app` — matches the `com.<name>.app`
+convention SharpRight (`com.sharpright.app`) and XCMr (`com.xcmr.app`)
+already use on Play; the internal code package stays
+`com.asnidev.trailkeeperoffgrid` (Gradle `namespace`, untouched by this).
 
 ## Status
 
