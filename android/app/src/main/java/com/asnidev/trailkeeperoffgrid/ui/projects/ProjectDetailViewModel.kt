@@ -139,6 +139,28 @@ class ProjectDetailViewModel(private val projectId: String) : ViewModel() {
         }
     }
 
+    fun setReportResolved(reportId: String, resolved: Boolean) {
+        viewModelScope.launch { runCatching { LocalStore.setReportResolved(reportId, resolved) } }
+    }
+
+    fun deleteTrailReport(reportId: String) {
+        viewModelScope.launch { runCatching { LocalStore.deleteTrailReport(reportId) } }
+    }
+
+    fun uploadReportPhoto(reportId: String, jpeg: java.io.File) {
+        viewModelScope.launch {
+            runCatching { LocalStore.addReportPhoto(reportId, jpeg) }
+                .onFailure { e -> sync.update { it.copy(error = e.message ?: "Couldn't save the photo") } }
+        }
+    }
+
+    fun deleteReportPhoto(reportId: String, photoId: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.deleteReportPhoto(reportId, photoId) }
+                .onFailure { e -> sync.update { it.copy(error = e.message ?: "Couldn't delete the photo") } }
+        }
+    }
+
     /** No server to reconcile with; the Room flows already push every change. */
     fun refresh() {
         sync.update { it.copy(syncing = false, error = null) }
