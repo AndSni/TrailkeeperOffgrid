@@ -2,6 +2,8 @@ package com.asnidev.trailkeeperoffgrid.ui.record
 
 import android.annotation.SuppressLint
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.rotate
+import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Geo
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
@@ -84,6 +87,17 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
     var showReport by remember { mutableStateOf(false) }
     var pendingDeleteReport by remember { mutableStateOf<TrailReportEntity?>(null) }
     var name by remember { mutableStateOf("") }
+
+    val gpxImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val r = Backup.importGpx(context, uri, projectId)
+                message = r.detail
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         message?.let {
@@ -186,6 +200,17 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                     onClick = { showReport = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Report a trail condition") }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = {
+                        gpxImportLauncher.launch(
+                            arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Import GPX into this project") }
             }
 
             item { HorizontalDivider() }
