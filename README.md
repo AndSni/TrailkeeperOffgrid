@@ -28,7 +28,7 @@ All of P0, P1, P4 and P5 are done; P2 and P3 are substantially done.
 |-------|-------|
 | **P0 — fork & strip** | ✅ repo, package rename, build, CI (`android.yml` + `release.yml`) |
 | **P1 — de-server the data layer** | ✅ auth + network + sync removed; Room is the source of truth; on-device length/area/nearest-trail/rollups; opens straight to the project list |
-| **P2 — offline maps** | ◐ Settings → Offline maps: pick a region (Rīga & Vidzeme / Latvia / Baltics), download it to phone storage via MapLibre's offline store (tiles + style + fonts + sprite — a downloaded region is fully self-contained), progress, delete, storage readout. A genuinely first-run device (never online, nothing downloaded) now gets a clear "connect once and download a region" message over a faint world-coastline backdrop, instead of a blank rectangle. A self-hosted `pmtiles://` file (needs an external Planetiler run) is the one item still open — see `tiles/README.md`. |
+| **P2 — offline maps** | ◐ Settings → Offline maps: a quick list (Rīga & Vidzeme / Latvia / Estonia / Lithuania) plus **"Browse all countries"** — every country in the world, grouped by continent, searchable. Any of them downloads to phone storage via MapLibre's offline store (tiles + style + fonts + sprite — a downloaded region is fully self-contained), with progress, delete, storage readout. A genuinely first-run device (never online, nothing downloaded) now gets a clear "connect once and download a region" message over a faint world-coastline backdrop, instead of a blank rectangle. A self-hosted `pmtiles://` file (needs an external Planetiler run) is the one item still open — see `tiles/README.md`. |
 | **P3 — settings: username, DB cleanup, backup/restore** | ◐ Settings: optional display name, "Clear photos of completed tasks", storage breakdown, **full-workspace backup/restore zip** (data + GeoJSON + photos; merge or replace). GPX import/export still to come. |
 | **P4 — off-grid field features** | ✅ local reminders (inspection-due / task-overdue → notification inbox) · multi-format coordinates (decimal / DMS / UTM, copy-to-clipboard) · **track-back** — live distance+bearing to a route's start while recording, and a one-shot "bearing to start" check on any saved route. |
 | **P5 — trail condition reporting** | ✅ `trail_reports` entity (status / kind / severity / note / GPS / photos), logged from the Route tab, shown as a coloured map layer with its own tap-to-open detail sheet, resolve/reopen/delete, a matching "clear resolved report photos" cleanup action. First Room migration (v1→v2), with a real plain-JVM test harness (`app/src/test/`) — no Robolectric, runs in CI. |
@@ -36,6 +36,10 @@ All of P0, P1, P4 and P5 are done; P2 and P3 are substantially done.
 Bumped to MapLibre 11.8 (has `pmtiles://` support for the next map step).
 The map tab still points at an online style, but any region you download in
 Settings is then served from local storage with no network.
+
+On the project list, **hold a project card for 1 second** to rename it,
+change its activity, or delete it (two-step confirm; trails, structures and
+trail reports are shared and stay even if the project is deleted).
 
 ## Layout
 
