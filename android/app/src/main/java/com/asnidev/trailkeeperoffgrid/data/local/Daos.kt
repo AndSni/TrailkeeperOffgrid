@@ -172,6 +172,9 @@ interface TrailReportDao {
     suspend fun getById(id: String): TrailReportEntity?
 
     @Query("DELETE FROM trail_reports WHERE id = :id") suspend fun deleteById(id: String)
+
+    @Query("UPDATE trail_reports SET projectId = NULL WHERE projectId = :projectId")
+    suspend fun clearProjectId(projectId: String)
 }
 
 @Dao

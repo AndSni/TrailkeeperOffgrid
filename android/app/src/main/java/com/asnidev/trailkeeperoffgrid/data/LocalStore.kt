@@ -79,6 +79,17 @@ object LocalStore {
         db.projectDao().upsert(p.copy(name = name.trim().ifBlank { p.name }))
     }
 
+    /** Rename and/or change the activity (long-press a project card → Edit). */
+    suspend fun editProject(id: String, name: String, activity: String) {
+        val p = db.projectDao().getById(id) ?: return
+        db.projectDao().upsert(
+            p.copy(
+                name = name.trim().ifBlank { p.name },
+                activity = activity.trim().ifBlank { p.activity },
+            )
+        )
+    }
+
     suspend fun deleteProject(id: String) {
         db.withTransaction {
             db.taskDao().deleteForProject(id)
@@ -88,6 +99,9 @@ object LocalStore {
             db.inspectionDao().deleteForProject(id)
             db.trackDao().deleteForProject(id)
             db.projectMemberDao().deleteForProject(id)
+            // Trail reports are the monitoring layer, org-wide like trails
+            // and structures - detach rather than delete, same reasoning.
+            db.trailReportDao().clearProjectId(id)
             db.projectDao().deleteById(id)
         }
     }

@@ -52,4 +52,19 @@ class ProjectListViewModel : ViewModel() {
             creating.value = false
         }
     }
+
+    fun editProject(id: String, name: String, activity: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            runCatching { LocalStore.editProject(id, name, activity) }
+                .onFailure { e -> error.value = e.message ?: "Couldn't save the project" }
+        }
+    }
+
+    fun deleteProject(id: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.deleteProject(id) }
+                .onFailure { e -> error.value = e.message ?: "Couldn't delete the project" }
+        }
+    }
 }
