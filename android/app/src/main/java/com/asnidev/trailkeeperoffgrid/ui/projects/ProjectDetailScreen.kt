@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -84,6 +85,7 @@ import com.asnidev.trailkeeperoffgrid.ui.structures.StructuresViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
@@ -799,12 +801,35 @@ private fun TrailList(
     onSaveWalkedTrail: (String) -> Unit,
     onOpen: (TrailEntity) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val gpxImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val r = Backup.importGpx(context, uri, projectId)
+                Toast.makeText(context, r.detail, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item { WalkTrailCard(projectId, hasLocation, onSaveWalkedTrail) }
+        item {
+            OutlinedButton(
+                onClick = {
+                    gpxImportLauncher.launch(
+                        arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Import GPX into this project") }
+        }
         if (trails.isEmpty()) {
             item {
                 Text(

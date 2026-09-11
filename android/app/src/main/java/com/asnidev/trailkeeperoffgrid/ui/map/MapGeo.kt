@@ -96,8 +96,7 @@ object MapGeo {
                 structures.mapNotNull { it.geometryJson } +
                 tracks.mapNotNull { it.geometryJson }
         ).forEach { collectPoints(it, pts) }
-        if (pts.isEmpty()) return null
-        return LatLngBounds.Builder().includes(pts).build()
+        return safeBounds(pts)
     }
 
     /**
@@ -129,7 +128,11 @@ object MapGeo {
             return ProjectScope(trails.map { it.id }.toSet(), structures.map { it.id }.toSet(), null)
         }
 
-        val raw = LatLngBounds.Builder().includes(extentPts).build()
+        val raw = safeBounds(extentPts) ?: return ProjectScope(
+            trails.map { it.id }.toSet(),
+            structures.map { it.id }.toSet(),
+            null,
+        )
         val padded = padBounds(raw, 0.25)
 
         val trailIds =
@@ -167,6 +170,20 @@ object MapGeo {
             (south - latPad).coerceAtLeast(-90.0),
             west - lonPad,
         )
+    }
+
+    /**
+     * `LatLngBounds.Builder().build()` throws for fewer than 2 points, even
+     * though a single point is a perfectly valid (zero-size) bounds - so
+     * build that degenerate case by hand instead of going through Builder.
+     */
+    private fun safeBounds(pts: List<LatLng>): LatLngBounds? = when {
+        pts.isEmpty() -> null
+        pts.size == 1 -> {
+            val p = pts[0]
+            LatLngBounds.from(p.latitude, p.longitude, p.latitude, p.longitude)
+        }
+        else -> LatLngBounds.Builder().includes(pts).build()
     }
 
     private fun anyPointIn(geometryJson: String, bounds: LatLngBounds): Boolean {
