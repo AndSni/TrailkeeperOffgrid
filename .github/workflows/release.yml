@@ -92,10 +92,22 @@ jobs:
           git add dist/
           if git diff --cached --quiet; then
             echo "dist/ unchanged."
-          else
-            git commit -m "release: APK ${{ steps.stage.outputs.vname }} (${{ steps.stage.outputs.vcode }}) [skip ci]"
-            git push
+            exit 0
           fi
+          git commit -m "release: APK ${{ steps.stage.outputs.vname }} (${{ steps.stage.outputs.vcode }}) [skip ci]"
+          # main can move (another push, or this workflow racing its own
+          # prior run) between checkout and here — rebase onto the tip and
+          # retry a few times rather than failing the whole job.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — fetching + rebasing onto origin/main"
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "::error::Could not push dist/ after 5 attempts"
+          exit 1
 
       - name: Publish rolling 'latest' release
         env:
