@@ -134,6 +134,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun purgeResolvedReportPhotos() {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            val (reports, files, bytes) = LocalStore.purgeResolvedReportPhotos()
+            _busy.value = false
+            _message.value =
+                if (files == 0) "No photos on resolved reports to clear."
+                else "Cleared $files photo(s) from $reports resolved report(s), freed ${humanBytes(bytes)}. Report data kept."
+            refreshStorage()
+        }
+    }
+
     fun purgeCompletedTaskPhotos() {
         if (_busy.value) return
         _busy.value = true

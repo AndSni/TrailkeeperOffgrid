@@ -67,16 +67,19 @@ private val PHOTO_LIST = object : TypeToken<List<TaskPhotoRef>>() {}.type
 fun parseTaskPhotos(json: String): List<TaskPhotoRef> =
     runCatching { gson.fromJson<List<TaskPhotoRef>>(json, PHOTO_LIST) }.getOrDefault(emptyList())
 
+/** A photo strip for anything that carries a `photosJson` column of
+ * `[{id, caption, url}]` — tasks and trail-condition reports share the
+ * shape, so this doesn't take a [TaskEntity] directly. */
 @Composable
 fun TaskPhotoStrip(
-    task: TaskEntity,
+    photosJson: String,
     onUpload: (java.io.File) -> Unit,
     onDelete: (photoId: String) -> Unit,
     onOpen: (url: String) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val photos = remember(task.photosJson) { parseTaskPhotos(task.photosJson) }
+    val photos = remember(photosJson) { parseTaskPhotos(photosJson) }
     var working by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskPhotoRef?>(null) }
 
