@@ -459,6 +459,9 @@ private fun TaskDetailBody(
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    com.asnidev.trailkeeperoffgrid.data.Coordinates.pointFromGeoJson(task.geometryJson)?.let { (lat, lon) ->
+        com.asnidev.trailkeeperoffgrid.ui.common.CoordinatesRow(lat, lon)
+    }
     if (task.description.isNotBlank()) Text(task.description, style = MaterialTheme.typography.bodyMedium)
     TaskPhotoStrip(
         photosJson = task.photosJson,
@@ -541,6 +544,9 @@ private fun StructureDetailBody(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     if (structure.notes.isNotBlank()) Text(structure.notes, style = MaterialTheme.typography.bodyMedium)
+    com.asnidev.trailkeeperoffgrid.data.Coordinates.pointFromGeoJson(structure.geometryJson)?.let { (lat, lon) ->
+        com.asnidev.trailkeeperoffgrid.ui.common.CoordinatesRow(lat, lon)
+    }
     Text("Status", style = MaterialTheme.typography.labelLarge)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         statuses.forEach { st ->
