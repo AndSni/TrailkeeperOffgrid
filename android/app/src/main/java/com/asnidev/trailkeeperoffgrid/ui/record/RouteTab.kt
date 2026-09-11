@@ -350,6 +350,9 @@ private fun ReportCard(
             if (r.note.isNotBlank()) {
                 Text(r.note, style = MaterialTheme.typography.bodySmall)
             }
+            com.asnidev.trailkeeperoffgrid.data.Coordinates.pointFromGeoJson(r.geometryJson)?.let { (lat, lon) ->
+                com.asnidev.trailkeeperoffgrid.ui.common.CoordinatesRow(lat, lon)
+            }
             Text(
                 r.createdAt.take(10) + if (resolved) " · resolved" else "",
                 style = MaterialTheme.typography.labelSmall,
