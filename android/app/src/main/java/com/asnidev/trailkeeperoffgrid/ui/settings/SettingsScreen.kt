@@ -49,6 +49,12 @@ import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
+    var browsingCountries by rememberSaveable { mutableStateOf(false) }
+    if (browsingCountries) {
+        OfflineMapsScreen(vm = vm, onBack = { browsingCountries = false })
+        return
+    }
+
     val snackbar = remember { SnackbarHostState() }
     val message by vm.message.collectAsState()
 
@@ -78,7 +84,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { ProfileCard(vm) }
-            item { OfflineMapsCard(vm) }
+            item { OfflineMapsCard(vm, onBrowseAll = { browsingCountries = true }) }
             item { RemindersCard(vm) }
             item { BackupCard(vm) }
             item { StorageCard(vm) }
@@ -121,51 +127,31 @@ private fun ProfileCard(vm: SettingsViewModel) {
 }
 
 @Composable
-private fun OfflineMapsCard(vm: SettingsViewModel) {
-    val presets by vm.presets.collectAsState()
+private fun OfflineMapsCard(vm: SettingsViewModel, onBrowseAll: () -> Unit) {
+    val quick by vm.quickPresets.collectAsState()
     val downloaded by vm.downloadedRegions.collectAsState()
     val downloads by vm.downloads.collectAsState()
 
     SectionCard("Offline maps") {
         Text(
             "Download an area while you have signal so the map still works in " +
-                "the field. Zoom 4–14; a country is a few hundred MB.",
+                "the field. Zoom 4–14; a country is a few hundred MB — a large " +
+                "one may be too big for one region, see below.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (presets.isEmpty()) {
-            Text("No regions defined.", style = MaterialTheme.typography.bodySmall)
+        quick.forEach { p ->
+            RegionRow(
+                preset = p,
+                downloading = downloads[p.id],
+                alreadySaved = downloaded.any { it.name == p.name && it.complete },
+                onDownload = { vm.downloadPreset(p) },
+            )
         }
-        presets.forEach { p ->
-            val dl = downloads[p.id]
-            val already = downloaded.any { it.name == p.name && it.complete }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                    when {
-                        already -> Text("saved", color = MaterialTheme.colorScheme.primary)
-                        dl?.running == true ->
-                            Text("${(dl.fraction * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
-                        else ->
-                            OutlinedButton(onClick = { vm.downloadPreset(p) }) { Text("Download") }
-                    }
-                }
-                if (dl?.running == true) {
-                    LinearProgressIndicator(
-                        progress = { dl.fraction },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        "${dl.completed} / ${if (dl.required > 0) dl.required.toString() else "…"} tiles · ${humanBytes(dl.bytes)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                dl?.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                }
-            }
+
+        OutlinedButton(onClick = onBrowseAll, modifier = Modifier.fillMaxWidth()) {
+            Text("Browse all countries →")
         }
 
         if (downloaded.isNotEmpty()) {
@@ -183,6 +169,44 @@ private fun OfflineMapsCard(vm: SettingsViewModel) {
                     TextButton(onClick = { vm.deleteRegion(r.id, r.name) }) { Text("Delete") }
                 }
             }
+        }
+    }
+}
+
+/** One downloadable region — a quick-preset or a country — reused by
+ * [OfflineMapsCard] and [OfflineMapsScreen]. */
+@Composable
+fun RegionRow(
+    preset: OfflineMaps.Preset,
+    downloading: RegionDownloadUi?,
+    alreadySaved: Boolean,
+    onDownload: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(preset.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            when {
+                alreadySaved -> Text("saved", color = MaterialTheme.colorScheme.primary)
+                downloading?.running == true ->
+                    Text("${(downloading.fraction * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                else -> OutlinedButton(onClick = onDownload) { Text("Download") }
+            }
+        }
+        if (downloading?.running == true) {
+            LinearProgressIndicator(
+                progress = { downloading.fraction },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "${downloading.completed} / " +
+                    "${if (downloading.required > 0) downloading.required.toString() else "…"} tiles · " +
+                    humanBytes(downloading.bytes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        downloading?.error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

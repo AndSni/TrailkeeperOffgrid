@@ -26,10 +26,12 @@ import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
  */
 object OfflineMaps {
     /** A named area the user can tap to download. Loaded from
-     * `assets/offline_regions.json`; bbox is [west, south, east, north]. */
+     * `assets/offline_regions.json`; bbox is [west, south, east, north].
+     * [continent] is blank for the small hand-picked "quick" entries. */
     data class Preset(
         val id: String,
         val name: String,
+        val continent: String,
         val west: Double,
         val south: Double,
         val east: Double,
@@ -67,17 +69,36 @@ object OfflineMaps {
     private const val TILE_LIMIT = 200_000L
     private val gson = Gson()
 
-    fun presets(context: Context): List<Preset> {
+    /** The short curated list shown directly in Settings → Offline maps. */
+    fun quickPresets(context: Context): List<Preset> = presetArray(context, "quick")
+
+    /** Every country (Natural Earth 1:110m admin-0, public domain), for the
+     * "Browse all countries" screen. Already sorted continent-then-name in
+     * the asset, with the app's home continent first. */
+    fun countries(context: Context): List<Preset> = presetArray(context, "countries")
+
+    private var cachedJson: com.google.gson.JsonObject? = null
+
+    private fun regionsRoot(context: Context): com.google.gson.JsonObject? {
+        cachedJson?.let { return it }
         val json = runCatching {
             context.assets.open("offline_regions.json").bufferedReader().use { it.readText() }
-        }.getOrNull() ?: return emptyList()
+        }.getOrNull() ?: return null
+        val root = runCatching { JsonParser.parseString(json).asJsonObject }.getOrNull()
+        cachedJson = root
+        return root
+    }
+
+    private fun presetArray(context: Context, key: String): List<Preset> {
+        val arr = regionsRoot(context)?.getAsJsonArray(key) ?: return emptyList()
         return runCatching {
-            JsonParser.parseString(json).asJsonObject.getAsJsonArray("regions").map { el ->
+            arr.map { el ->
                 val o = el.asJsonObject
                 val bb = o.getAsJsonArray("bbox")
                 Preset(
                     id = o.get("id").asString,
                     name = o.get("name").asString,
+                    continent = o.get("continent")?.asString ?: "",
                     west = bb[0].asDouble,
                     south = bb[1].asDouble,
                     east = bb[2].asDouble,
