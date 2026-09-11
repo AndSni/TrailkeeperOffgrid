@@ -12,10 +12,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * data. There is no server to re-sync from, so:
  *
  *  - `exportSchema = true`: the schema JSON for every version is committed
- *    under `app/schemas/`. Each [Migration]'s DDL is checked byte-for-byte
- *    against the exported `createSql` of the target version before release
- *    (a Robolectric `MigrationTestHelper` harness was tried but is far too
- *    slow to run in this environment / CI).
+ *    under `app/schemas/`. Each [Migration]'s DDL lives in a named
+ *    `..._SQL` constant so `data/local/MigrationSqlTest.kt` (a plain-JVM
+ *    test against real SQLite via `org.xerial:sqlite-jdbc` — a Robolectric
+ *    `MigrationTestHelper` harness was tried first but is far too slow to
+ *    run in this environment / CI) can build the real v1 schema, run the
+ *    exact same SQL Room runs, and assert the result against the exported
+ *    schema JSON.
  *  - **No** `fallbackToDestructiveMigration()`. A missing migration throws
  *    loudly at open instead of silently wiping the field data.
  *
@@ -60,25 +63,29 @@ abstract class TrailkeeperDb : RoomDatabase() {
     abstract fun backupDao(): BackupDao
 
     companion object {
+        /** The exact DDL [MIGRATION_1_2] runs — pulled out so
+         * `MigrationSqlTest` can execute this same string against a real
+         * SQLite engine and assert it produces the schema `2.json` declares. */
+        const val CREATE_TRAIL_REPORTS_V2: String =
+            "CREATE TABLE IF NOT EXISTS `trail_reports` (" +
+                "`id` TEXT NOT NULL, " +
+                "`organisationId` TEXT NOT NULL, " +
+                "`projectId` TEXT, " +
+                "`status` TEXT NOT NULL, " +
+                "`kind` TEXT NOT NULL, " +
+                "`severity` TEXT NOT NULL, " +
+                "`note` TEXT NOT NULL, " +
+                "`geometryJson` TEXT, " +
+                "`nearestTrailId` TEXT, " +
+                "`photosJson` TEXT NOT NULL, " +
+                "`reportedById` TEXT, " +
+                "`createdAt` TEXT NOT NULL, " +
+                "`resolvedAt` TEXT, " +
+                "PRIMARY KEY(`id`))"
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `trail_reports` (" +
-                        "`id` TEXT NOT NULL, " +
-                        "`organisationId` TEXT NOT NULL, " +
-                        "`projectId` TEXT, " +
-                        "`status` TEXT NOT NULL, " +
-                        "`kind` TEXT NOT NULL, " +
-                        "`severity` TEXT NOT NULL, " +
-                        "`note` TEXT NOT NULL, " +
-                        "`geometryJson` TEXT, " +
-                        "`nearestTrailId` TEXT, " +
-                        "`photosJson` TEXT NOT NULL, " +
-                        "`reportedById` TEXT, " +
-                        "`createdAt` TEXT NOT NULL, " +
-                        "`resolvedAt` TEXT, " +
-                        "PRIMARY KEY(`id`))"
-                )
+                db.execSQL(CREATE_TRAIL_REPORTS_V2)
             }
         }
 

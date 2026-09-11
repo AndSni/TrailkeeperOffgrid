@@ -111,4 +111,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Plain-JVM migration test (data/local/MigrationSqlTest.kt) — a real
+    // SQLite engine, no Android/Robolectric, so it stays fast in CI.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.3")
 }
