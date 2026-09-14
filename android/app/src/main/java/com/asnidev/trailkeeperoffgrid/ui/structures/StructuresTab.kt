@@ -1,8 +1,9 @@
 package com.asnidev.trailkeeperoffgrid.ui.structures
 
-import android.annotation.SuppressLint
-import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -52,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -59,10 +62,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionEntity
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionFormEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
+import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import com.asnidev.trailkeeperoffgrid.ui.common.PointPickerScreen
-import com.google.android.gms.location.LocationServices
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +76,7 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
     val message by vm.message.collectAsState()
 
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingStructure by remember { mutableStateOf<StructureEntity?>(null) }
     // add flow: "none" | "form" | "picking"
     var addMode by remember { mutableStateOf("none") }
     var addName by remember { mutableStateOf("") }
@@ -134,6 +137,8 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
                 onLog = { formId, answers, risk, condition, notes ->
                     vm.logInspection(open.id, formId, answers, risk, condition, notes, onDone = {})
                 },
+                onEditInspection = { id, risk, condition, notes -> vm.editInspection(id, risk, condition, notes) },
+                onDeleteInspection = { id -> vm.deleteInspection(id) },
             )
         } else {
             LazyColumn(
@@ -157,7 +162,28 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
                 }
                 items(structures, key = { it.id }) { s ->
                     val n = inspections.count { it.structureId == s.id }
-                    Card(onClick = { openId = s.id }, modifier = Modifier.fillMaxWidth()) {
+                    // Hold for 1s -> edit/delete; a short tap opens it. Same
+                    // shape as the project-card gesture in ProjectListScreen.
+                    Card(
+                        modifier = Modifier.fillMaxWidth().pointerInput(s.id) {
+                            awaitEachGesture {
+                                awaitFirstDown()
+                                var released = false
+                                val heldFull =
+                                    withTimeoutOrNull(1_000L) {
+                                        released = waitForUpOrCancellation() != null
+                                        true
+                                    } == null
+                                when {
+                                    heldFull -> {
+                                        editingStructure = s
+                                        waitForUpOrCancellation()
+                                    }
+                                    released -> openId = s.id
+                                }
+                            }
+                        }
+                    ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 StatusTag(s.status)
@@ -183,6 +209,14 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
         }
     }
 
+    editingStructure?.let { s ->
+        EditStructureDialog(
+            structure = s,
+            onDismiss = { editingStructure = null },
+            onSave = { req -> vm.patchStructure(s.id, req); editingStructure = null },
+            onDelete = { vm.deleteStructure(s.id); editingStructure = null },
+        )
+    }
 }
 
 @Composable
@@ -214,8 +248,11 @@ private fun StructureDetail(
     saving: Boolean,
     onBack: () -> Unit,
     onLog: (String?, Map<String, Any?>, String?, String?, String) -> Unit,
+    onEditInspection: (id: String, risk: String?, condition: String?, notes: String) -> Unit,
+    onDeleteInspection: (id: String) -> Unit,
 ) {
     var showForm by remember { mutableStateOf(false) }
+    var editingInspection by remember { mutableStateOf<InspectionEntity?>(null) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -270,7 +307,9 @@ private fun StructureDetail(
                 )
             }
         }
-        items(inspections, key = { it.id }) { i -> InspectionCard(i) }
+        items(inspections, key = { it.id }) { i ->
+            InspectionCard(i, onLongPress = { editingInspection = i })
+        }
     }
 
     if (showForm) {
@@ -284,14 +323,45 @@ private fun StructureDetail(
             },
         )
     }
+
+    editingInspection?.let { i ->
+        EditInspectionDialog(
+            inspection = i,
+            onDismiss = { editingInspection = null },
+            onSave = { risk, condition, notes ->
+                onEditInspection(i.id, risk, condition, notes)
+                editingInspection = null
+            },
+            onDelete = {
+                onDeleteInspection(i.id)
+                editingInspection = null
+            },
+        )
+    }
 }
 
 @Composable
-private fun InspectionCard(i: InspectionEntity) {
-    Card(Modifier.fillMaxWidth()) {
+private fun InspectionCard(i: InspectionEntity, onLongPress: () -> Unit) {
+    // Hold for 1s -> edit/delete; matches the structure-card gesture above.
+    Card(
+        modifier = Modifier.fillMaxWidth().pointerInput(i.id) {
+            awaitEachGesture {
+                awaitFirstDown()
+                val heldFull =
+                    withTimeoutOrNull(1_000L) {
+                        waitForUpOrCancellation()
+                        true
+                    } == null
+                if (heldFull) {
+                    onLongPress()
+                    waitForUpOrCancellation()
+                }
+            }
+        }
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(i.inspectedOn, style = MaterialTheme.typography.titleSmall)
+                Text(formatInspectedOn(i.inspectedOn), style = MaterialTheme.typography.titleSmall)
                 i.risk?.let { RiskTag(it) }
             }
             i.condition?.let {
@@ -301,6 +371,201 @@ private fun InspectionCard(i: InspectionEntity) {
                 Text(i.notes, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+private fun formatInspectedOn(iso: String): String =
+    runCatching {
+        java.time.Instant.parse(iso)
+            .atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm"))
+    }.getOrDefault(iso.take(16).replace('T', ' '))
+
+/** Reused from the Structures tab (hold a card) and Settings' "Manage
+ * structures" screen (structures are org-wide, not project-scoped). */
+@Composable
+fun EditStructureDialog(
+    structure: StructureEntity,
+    onDismiss: () -> Unit,
+    onSave: (StructurePatchRequest) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var name by remember(structure.id) { mutableStateOf(structure.name) }
+    var type by remember(structure.id) { mutableStateOf(structure.structureType) }
+    var status by remember(structure.id) { mutableStateOf(structure.status) }
+    var material by remember(structure.id) { mutableStateOf(structure.material) }
+    var notes by remember(structure.id) { mutableStateOf(structure.notes) }
+    var color by remember(structure.id) { mutableStateOf(structure.color) }
+    var typeMenu by remember { mutableStateOf(false) }
+    var statusMenu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit structure") },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box {
+                        OutlinedButton(onClick = { typeMenu = true }) { Text(type.replace('_', ' ')) }
+                        DropdownMenu(expanded = typeMenu, onDismissRequest = { typeMenu = false }) {
+                            STRUCTURE_TYPES.forEach { t ->
+                                DropdownMenuItem(
+                                    text = { Text(t.replace('_', ' ')) },
+                                    onClick = { type = t; typeMenu = false },
+                                )
+                            }
+                        }
+                    }
+                    Box {
+                        OutlinedButton(onClick = { statusMenu = true }) { Text(status.replace('_', ' ')) }
+                        DropdownMenu(expanded = statusMenu, onDismissRequest = { statusMenu = false }) {
+                            STRUCTURE_STATUSES.forEach { s ->
+                                DropdownMenuItem(
+                                    text = { Text(s.replace('_', ' ')) },
+                                    onClick = { status = s; statusMenu = false },
+                                )
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = material,
+                    onValueChange = { material = it },
+                    label = { Text("Material") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Marker colour", style = MaterialTheme.typography.labelLarge)
+                ColorPicker(selected = color, onSelect = { color = it })
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    onClick = { confirmDelete = true },
+                ) { Text("Delete structure") }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    onSave(
+                        StructurePatchRequest(
+                            name = name.trim(),
+                            structureType = type,
+                            status = status,
+                            material = material.trim(),
+                            color = color,
+                            notes = notes.trim(),
+                        )
+                    )
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete structure?") },
+            text = { Text("\"${structure.name}\" will be removed. Its logged inspections stay on record.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EditInspectionDialog(
+    inspection: InspectionEntity,
+    onDismiss: () -> Unit,
+    onSave: (risk: String?, condition: String?, notes: String) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var risk by remember(inspection.id) { mutableStateOf(inspection.risk) }
+    var condition by remember(inspection.id) { mutableStateOf(inspection.condition) }
+    var notes by remember(inspection.id) { mutableStateOf(inspection.notes) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit inspection") },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    formatInspectedOn(inspection.inspectedOn),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("Risk", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = risk == null, onClick = { risk = null }, label = { Text("—") })
+                    INSPECTION_RISKS.forEach { r ->
+                        FilterChip(selected = risk == r, onClick = { risk = r }, label = { Text(r) })
+                    }
+                }
+                Text("Set structure condition", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = condition == null, onClick = { condition = null }, label = { Text("—") })
+                    STRUCTURE_STATUSES.forEach { c ->
+                        FilterChip(
+                            selected = condition == c,
+                            onClick = { condition = c },
+                            label = { Text(c.replace('_', ' ')) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    onClick = { confirmDelete = true },
+                ) { Text("Delete inspection") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(risk, condition, notes) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete inspection?") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -598,11 +863,3 @@ private fun Tag(text: String, color: Color) {
         )
     }
 }
-
-@SuppressLint("MissingPermission")
-private suspend fun lastLocation(context: Context): android.location.Location? =
-    suspendCancellableCoroutine { cont ->
-        LocationServices.getFusedLocationProviderClient(context).lastLocation
-            .addOnSuccessListener { cont.resume(it) }
-            .addOnFailureListener { cont.resume(null) }
-    }

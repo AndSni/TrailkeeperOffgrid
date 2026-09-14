@@ -1,7 +1,5 @@
 package com.asnidev.trailkeeperoffgrid.ui.record
 
-import android.annotation.SuppressLint
-import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -60,10 +58,8 @@ import com.asnidev.trailkeeperoffgrid.record.RecPhase
 import com.asnidev.trailkeeperoffgrid.record.RecPoint
 import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
 import com.asnidev.trailkeeperoffgrid.record.TrackRecordingService
-import com.google.android.gms.location.LocationServices
-import kotlin.coroutines.resume
+import com.asnidev.trailkeeperoffgrid.location.freshLocation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 private val PRIORITIES = listOf("low", "medium", "high", "urgent")
 
@@ -253,7 +249,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
             onSubmit = { status, kind, severity, note ->
                 showReport = false
                 scope.launch {
-                    val loc = lastLocation(context)
+                    val loc = freshLocation(context)
                     runCatching {
                         LocalStore.createTrailReport(
                             projectId, status, kind, severity, note,
@@ -287,7 +283,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
             onMark = { title, priority ->
                 showMark = false
                 scope.launch {
-                    val loc = lastLocation(context)
+                    val loc = freshLocation(context)
                     if (loc == null) {
                         message = "No GPS fix yet — try again in a moment."
                     } else {
@@ -358,7 +354,7 @@ private fun TrackCard(t: TrackEntity) {
                     scope.launch {
                         val start = LocalStore.trackPoints(t.id).firstOrNull()?.let { it.lat to it.lon }
                             ?: Geo.lineLatLon(t.geometryJson).firstOrNull()
-                        val loc = lastLocation(context)
+                        val loc = freshLocation(context)
                         backInfo = when {
                             start == null -> "No start point saved for this route."
                             loc == null -> "No GPS fix yet — try again in a moment."
@@ -534,11 +530,3 @@ private fun fmtDuration(ms: Long): String {
 
 private fun fmtKm(m: Double): String =
     if (m < 1000) "${m.toInt()} m" else "%.2f km".format(m / 1000.0)
-
-@SuppressLint("MissingPermission")
-private suspend fun lastLocation(context: Context): android.location.Location? =
-    suspendCancellableCoroutine { cont ->
-        LocationServices.getFusedLocationProviderClient(context).lastLocation
-            .addOnSuccessListener { cont.resume(it) }
-            .addOnFailureListener { cont.resume(null) }
-    }

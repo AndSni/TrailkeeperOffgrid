@@ -1,7 +1,5 @@
 package com.asnidev.trailkeeperoffgrid.ui.common
 
-import android.annotation.SuppressLint
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,10 +28,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.android.gms.location.LocationServices
-import kotlin.coroutines.resume
+import com.asnidev.trailkeeperoffgrid.location.freshLocation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -136,7 +132,7 @@ fun PointPickerScreen(
                         enabled = hasLocation,
                         onClick = {
                             scope.launch {
-                                lastLocation(context)?.let { loc ->
+                                freshLocation(context)?.let { loc ->
                                     val p = loc.latitude to loc.longitude
                                     pointHolder[0] = p
                                     point = p
@@ -191,11 +187,3 @@ private fun pushPoint(style: Style, p: Pair<Double, Double>?) {
         else """{"type":"Point","coordinates":[${p.second},${p.first}]}"""
     (style.getSource(SRC) as? GeoJsonSource)?.setGeoJson(json)
 }
-
-@SuppressLint("MissingPermission")
-private suspend fun lastLocation(context: Context): android.location.Location? =
-    suspendCancellableCoroutine { cont ->
-        LocationServices.getFusedLocationProviderClient(context).lastLocation
-            .addOnSuccessListener { cont.resume(it) }
-            .addOnFailureListener { cont.resume(null) }
-    }

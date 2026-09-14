@@ -54,6 +54,11 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
         OfflineMapsScreen(vm = vm, onBack = { browsingCountries = false })
         return
     }
+    var managingStructures by rememberSaveable { mutableStateOf(false) }
+    if (managingStructures) {
+        ManageStructuresScreen(vm = vm, onBack = { managingStructures = false })
+        return
+    }
 
     val snackbar = remember { SnackbarHostState() }
     val message by vm.message.collectAsState()
@@ -85,6 +90,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
         ) {
             item { ProfileCard(vm) }
             item { OfflineMapsCard(vm, onBrowseAll = { browsingCountries = true }) }
+            item { StructuresCard(vm, onManage = { managingStructures = true }) }
             item { RemindersCard(vm) }
             item { BackupCard(vm) }
             item { StorageCard(vm) }
@@ -377,6 +383,22 @@ private fun BackupCard(vm: SettingsViewModel) {
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun StructuresCard(vm: SettingsViewModel, onManage: () -> Unit) {
+    val structures by vm.structures.collectAsState()
+    SectionCard("Structures") {
+        Text(
+            "Culverts, bridges, signs and more are shared across every project. " +
+                "Rename, retype or delete any of them here.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onManage) {
+            Text("Manage structures (${structures.size})")
+        }
     }
 }
 

@@ -158,6 +158,20 @@ class StructuresViewModel(private val projectId: String) : ViewModel() {
         }
     }
 
+    fun editInspection(id: String, risk: String?, condition: String?, notes: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.updateInspection(id, risk, condition, notes) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't update the inspection" }
+        }
+    }
+
+    fun deleteInspection(id: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.deleteInspection(id) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't delete the inspection" }
+        }
+    }
+
     fun clearMessage() {
         _message.value = null
     }

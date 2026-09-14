@@ -10,7 +10,9 @@ import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 import com.asnidev.trailkeeperoffgrid.data.Reminders
 import com.asnidev.trailkeeperoffgrid.data.local.ProjectEntity
+import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
+import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +67,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     val projects: StateFlow<List<ProjectEntity>> =
         TrailkeeperDb.db.projectDao().observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Structures are org-wide (not tied to one project), so they need a
+    // place to browse/edit them all regardless of which project is open.
+    val structures: StateFlow<List<StructureEntity>> =
+        TrailkeeperDb.db.structureDao().observeForOrg(Identity.ORG_ID)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -212,6 +220,20 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             val r = Backup.importGpx(ctx, src, projectId)
             _busy.value = false
             _message.value = if (r.ok) r.detail else "GPX import failed: ${r.detail}"
+        }
+    }
+
+    fun patchStructure(id: String, req: StructurePatchRequest) {
+        viewModelScope.launch {
+            runCatching { LocalStore.updateStructure(id, req) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't update the structure" }
+        }
+    }
+
+    fun deleteStructure(id: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.deleteStructure(id) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't delete the structure" }
         }
     }
 

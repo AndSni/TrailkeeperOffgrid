@@ -513,6 +513,13 @@ object LocalStore {
         return id
     }
 
+    suspend fun updateInspection(id: String, risk: String?, condition: String?, notes: String) {
+        val i = db.inspectionDao().getById(id) ?: return
+        db.inspectionDao().upsert(i.copy(risk = risk, condition = condition, notes = notes.trim()))
+    }
+
+    suspend fun deleteInspection(id: String) = db.inspectionDao().deleteById(id)
+
     // ---- segment work + rollup -----------------------------------
 
     suspend fun logSegmentWork(req: SegmentWorkCreateRequest): String {

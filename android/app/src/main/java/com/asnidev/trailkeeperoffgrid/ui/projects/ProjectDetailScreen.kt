@@ -1,7 +1,6 @@
 package com.asnidev.trailkeeperoffgrid.ui.projects
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
@@ -90,12 +89,10 @@ import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
-import com.google.android.gms.location.LocationServices
+import com.asnidev.trailkeeperoffgrid.location.freshLocation
 import com.google.gson.JsonParser
-import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 private val PRIORITIES = listOf("low", "medium", "high", "urgent")
 
@@ -351,7 +348,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
             onCreate = { title, priority ->
                 showAdd = false
                 scope.launch {
-                    val loc = if (hasLocation) currentDeviceLocation(context) else null
+                    val loc = if (hasLocation) freshLocation(context) else null
                     vm.addTask(title, priority, loc?.latitude, loc?.longitude)
                 }
             },
@@ -928,15 +925,6 @@ private fun WalkTrailCard(projectId: String, hasLocation: Boolean, onSave: (Stri
         }
     }
 }
-
-/** Best-effort current fix from the fused provider; null if unavailable. */
-@SuppressLint("MissingPermission")
-private suspend fun currentDeviceLocation(context: Context): android.location.Location? =
-    suspendCancellableCoroutine { cont ->
-        LocationServices.getFusedLocationProviderClient(context).lastLocation
-            .addOnSuccessListener { cont.resume(it) }
-            .addOnFailureListener { cont.resume(null) }
-    }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

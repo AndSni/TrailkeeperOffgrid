@@ -25,8 +25,28 @@ already use on Play; the internal code package stays
 
 ## Status
 
-**v0.2.5** — refined app icon glyph (re-saved source art, same 1:1
-resize pipeline). v0.2.3 fixed the launcher icon: v0.2.2 shipped it over-cropped and
+**v0.3.0** — field-test fixes:
+
+- **Location accuracy.** Every one-shot "where am I" call (marking a task,
+  a structure, a point) used the fused provider's *cached* `lastLocation`,
+  which can be minutes old and/or a coarse network fix — that's what made
+  on-the-ground marking land tens of metres off. They now force a fresh
+  `PRIORITY_HIGH_ACCURACY` GPS fix (`location/CurrentLocation.kt`). The
+  map's live "blue dot" had the same problem with MapLibre's default
+  engine request; it's now pinned to high accuracy too.
+- **Map controls.** A locate button on the map (bottom-right) cycles
+  free pan → centre on me (north-up) → centre + rotate to your direction
+  of travel. A Nokia-bars-style GPS signal indicator (top-right) shows
+  satellites-used-in-fix as 0-4 bars.
+- **Hold to edit.** Structures and inspections now use the same "hold a
+  card for 1 second" gesture as project cards, to rename/retype/delete.
+- **Settings → Manage structures**, since structures are shared across
+  every project, not owned by one — a single place to edit or delete any
+  of them regardless of which project is open.
+- **Inspection dates** are now `dd.MM.yyyy, HH:mm` instead of a raw ISO
+  timestamp.
+
+v0.2.3 fixed the launcher icon: v0.2.2 shipped it over-cropped and
 scaled ~1.8x too large (the generator discarded the source art's own
 padding and re-scaled to a fixed 62% fraction instead of respecting the
 template-calibrated scale already in `appicon.png`), so it looked
@@ -58,7 +78,9 @@ Settings is then served from local storage with no network.
 
 On the project list, **hold a project card for 1 second** to rename it,
 change its activity, or delete it (two-step confirm; trails, structures and
-trail reports are shared and stay even if the project is deleted).
+trail reports are shared and stay even if the project is deleted). The same
+hold-for-1s gesture edits a structure (Structures tab, or Settings →
+Manage structures) or an inspection (inside a structure's detail screen).
 
 ## Layout
 

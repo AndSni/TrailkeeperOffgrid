@@ -2,20 +2,36 @@ package com.asnidev.trailkeeperoffgrid.ui.map
 
 import android.annotation.SuppressLint
 import android.graphics.PointF
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GpsNotFixed
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -27,11 +43,14 @@ import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
+import com.asnidev.trailkeeperoffgrid.location.GnssSignalMonitor
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.OnCameraTrackingChangedListener
+import org.maplibre.android.location.engine.LocationEngineRequest
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
@@ -93,6 +112,15 @@ fun ProjectMap(
     // area with no network, so a later failure outside that area correctly
     // just renders a blank map there instead of this message.
     var mapUnavailable by remember { mutableStateOf(false) }
+    var trackingMode by remember { mutableIntStateOf(CameraMode.NONE) }
+    var gpsBars by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(hasLocationPermission) {
+        val monitor = if (hasLocationPermission) {
+            GnssSignalMonitor(context) { gpsBars = it }.also { it.start() }
+        } else null
+        onDispose { monitor?.stop() }
+    }
 
     val mapView = remember {
         MapView(context).apply {
@@ -195,7 +223,7 @@ fun ProjectMap(
                             PropertyFactory.circleStrokeColor("#FFFFFF"),
                         )
                     )
-                    enableLocation(context, map, style, hasLocationPermission)
+                    enableLocation(context, map, style, hasLocationPermission) { trackingMode = it }
                     pushData(
                         holder, trails, tasks, structures, tracks, reports,
                         projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
@@ -258,6 +286,84 @@ fun ProjectMap(
                 )
             }
         }
+        if (hasLocationPermission) {
+            GpsSignalBars(
+                bars = gpsBars,
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+            )
+        }
+        LocateButton(
+            mode = trackingMode,
+            enabled = hasLocationPermission,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            onClick = {
+                holder.map?.locationComponent?.let { lc ->
+                    val next = when (trackingMode) {
+                        CameraMode.NONE -> CameraMode.TRACKING
+                        CameraMode.TRACKING -> CameraMode.TRACKING_GPS
+                        else -> CameraMode.NONE
+                    }
+                    lc.renderMode = if (next == CameraMode.TRACKING_GPS) RenderMode.GPS else RenderMode.COMPASS
+                    lc.cameraMode = next
+                    trackingMode = next
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Cycles NONE -> TRACKING (center, north-up) -> TRACKING_GPS (center +
+ * rotate map to the direction of travel) -> NONE. Also updated externally
+ * when the user pans/rotates away (MapLibre drops tracking on gesture, via
+ * [OnCameraTrackingChangedListener]), so the icon always reflects reality.
+ */
+@Composable
+private fun LocateButton(mode: Int, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val active = mode != CameraMode.NONE
+    Surface(
+        modifier = modifier.size(48.dp).clip(CircleShape),
+        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp,
+    ) {
+        IconButton(onClick = onClick, enabled = enabled) {
+            Icon(
+                if (mode == CameraMode.TRACKING_GPS) Icons.Filled.Navigation
+                else if (mode == CameraMode.TRACKING) Icons.Filled.MyLocation
+                else Icons.Filled.GpsNotFixed,
+                contentDescription = "Centre on my location",
+                tint = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/** Nokia-coverage-bars-style GPS signal indicator, 0-4 bars. */
+@Composable
+private fun GpsSignalBars(bars: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        shape = RoundedCornerShape(6.dp),
+        tonalElevation = 4.dp,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            for (i in 1..4) {
+                val on = i <= bars
+                Box(
+                    Modifier
+                        .size(width = 4.dp, height = (6 + i * 3).dp)
+                        .align(Alignment.Bottom)
+                        .background(
+                            if (on) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                )
+            }
+        }
     }
 }
 
@@ -312,13 +418,33 @@ private fun enableLocation(
     map: MapLibreMap,
     style: Style,
     hasPermission: Boolean,
+    onTrackingModeChanged: (Int) -> Unit,
 ) {
     if (!hasPermission) return
     val lc = map.locationComponent
+    // The default engine request favours battery over accuracy, which is
+    // what made the on-map "blue dot" (and anything marked from it) lag
+    // metres behind an actual GPS fix - force a real GPS-backed one instead.
+    val request = LocationEngineRequest.Builder(1_000L)
+        .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
+        .setFastestInterval(500L)
+        .build()
     lc.activateLocationComponent(
-        LocationComponentActivationOptions.builder(context, style).build()
+        LocationComponentActivationOptions.builder(context, style)
+            .locationEngineRequest(request)
+            .useDefaultLocationEngine(true)
+            .build()
     )
     lc.isLocationComponentEnabled = true
     lc.renderMode = RenderMode.COMPASS
     lc.cameraMode = CameraMode.NONE
+    lc.addOnCameraTrackingChangedListener(object : OnCameraTrackingChangedListener {
+        override fun onCameraTrackingDismissed() {
+            onTrackingModeChanged(CameraMode.NONE)
+        }
+
+        override fun onCameraTrackingChanged(currentMode: Int) {
+            onTrackingModeChanged(currentMode)
+        }
+    })
 }

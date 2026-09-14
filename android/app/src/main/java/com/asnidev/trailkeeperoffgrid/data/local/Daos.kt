@@ -153,6 +153,8 @@ interface InspectionDao {
 
     @Query("SELECT * FROM inspections") suspend fun listAll(): List<InspectionEntity>
 
+    @Query("SELECT * FROM inspections WHERE id = :id") suspend fun getById(id: String): InspectionEntity?
+
     @Query("DELETE FROM inspections WHERE id = :id") suspend fun deleteById(id: String)
 
     @Query("DELETE FROM inspections WHERE projectId = :projectId")
