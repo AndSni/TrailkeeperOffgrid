@@ -25,6 +25,18 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.2** fixes the map's GPS signal indicator, which never lit up: it
+read satellite status from a separate raw-GNSS registration that could
+end up with no events at all if the fix was actually coming from a
+non-GPS source (network/wifi) rather than the GNSS chip. It now reads the
+same `Location.accuracy` (in metres) that already drives the blue dot's
+own accuracy circle, so the indicator can't disagree with what's on the
+map and needs no separate subscription. Full bars = accuracy ≤10m; each
+bar down doubles the radius (≤20 / ≤40 / ≤80m) — accuracy degrades
+exponentially with weaker signal, so a linear scale would peg almost
+every fix at full bars and never show what actually matters. The exact
+figure (e.g. "±14m") is printed under the bars.
+
 **v0.3.1** corrects a misread of v0.3.0's Settings ask:
 
 - **Settings → Structure types** (not "Manage structures", which just
@@ -51,8 +63,8 @@ already use on Play; the internal code package stays
   engine request; it's now pinned to high accuracy too.
 - **Map controls.** A locate button on the map (bottom-right) cycles
   free pan → centre on me (north-up) → centre + rotate to your direction
-  of travel. A Nokia-bars-style GPS signal indicator (top-right) shows
-  satellites-used-in-fix as 0-4 bars.
+  of travel. A Nokia-bars-style GPS signal indicator (top-right) — see
+  v0.3.2 above for how its bars are actually derived now.
 - **Hold to edit.** Structures and inspections now use the same "hold a
   card for 1 second" gesture as project cards, to rename/retype/delete.
   (v0.3.0 also put an instance list in Settings under "Manage

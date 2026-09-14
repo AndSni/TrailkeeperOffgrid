@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +44,8 @@ import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
-import com.asnidev.trailkeeperoffgrid.location.GnssSignalMonitor
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -113,13 +115,22 @@ fun ProjectMap(
     // just renders a blank map there instead of this message.
     var mapUnavailable by remember { mutableStateOf(false) }
     var trackingMode by remember { mutableIntStateOf(CameraMode.NONE) }
-    var gpsBars by remember { mutableIntStateOf(0) }
+    var accuracyM by remember { mutableStateOf<Float?>(null) }
 
-    DisposableEffect(hasLocationPermission) {
-        val monitor = if (hasLocationPermission) {
-            GnssSignalMonitor(context) { gpsBars = it }.also { it.start() }
-        } else null
-        onDispose { monitor?.stop() }
+    // Polls the same location stream that draws the blue dot / accuracy
+    // circle, rather than a separate raw-GNSS registration - that way the
+    // indicator can never disagree with what's actually on the map, and
+    // there's no second location subscription to keep alive.
+    LaunchedEffect(hasLocationPermission) {
+        if (!hasLocationPermission) {
+            accuracyM = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            accuracyM = holder.map?.locationComponent?.lastKnownLocation
+                ?.takeIf { it.hasAccuracy() }?.accuracy
+            delay(1_000L)
+        }
     }
 
     val mapView = remember {
@@ -288,7 +299,7 @@ fun ProjectMap(
         }
         if (hasLocationPermission) {
             GpsSignalBars(
-                bars = gpsBars,
+                accuracyM = accuracyM,
                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             )
         }
@@ -338,31 +349,56 @@ private fun LocateButton(mode: Int, enabled: Boolean, modifier: Modifier = Modif
     }
 }
 
-/** Nokia-coverage-bars-style GPS signal indicator, 0-4 bars. */
+/**
+ * Full bars at the phone's best realistic fix (≤10m); each bar down
+ * doubles the radius. A linear meters-to-bars scale would pin almost
+ * every real fix at "full bars" and never show the difference that
+ * actually matters out on the trail, so this follows accuracy's own
+ * exponential character instead.
+ */
+private fun accuracyBars(accuracyM: Float?): Int = when {
+    accuracyM == null -> 0
+    accuracyM <= 10f -> 4
+    accuracyM <= 20f -> 3
+    accuracyM <= 40f -> 2
+    accuracyM <= 80f -> 1
+    else -> 0
+}
+
+/** Nokia-coverage-bars-style GPS indicator (0-4 bars from [accuracyBars])
+ * with the actual precision in meters underneath. */
 @Composable
-private fun GpsSignalBars(bars: Int, modifier: Modifier = Modifier) {
+private fun GpsSignalBars(accuracyM: Float?, modifier: Modifier = Modifier) {
+    val bars = accuracyBars(accuracyM)
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
         shape = RoundedCornerShape(6.dp),
         tonalElevation = 4.dp,
     ) {
-        Row(
+        Column(
             Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            for (i in 1..4) {
-                val on = i <= bars
-                Box(
-                    Modifier
-                        .size(width = 4.dp, height = (6 + i * 3).dp)
-                        .align(Alignment.Bottom)
-                        .background(
-                            if (on) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        )
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                for (i in 1..4) {
+                    val on = i <= bars
+                    Box(
+                        Modifier
+                            .size(width = 4.dp, height = (6 + i * 3).dp)
+                            .align(Alignment.Bottom)
+                            .background(
+                                if (on) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                    )
+                }
             }
+            Text(
+                if (accuracyM != null) "±${accuracyM.roundToInt()}m" else "no fix",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
