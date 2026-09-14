@@ -5,13 +5,7 @@ import android.content.Context
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationManager
-import android.os.Looper
 import androidx.core.content.getSystemService
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 
 data class DevSatellite(
     val svid: Int,
@@ -34,17 +28,13 @@ data class DevGpsState(
  * lifecycle (`start`/`stop`), never run in the background.
  */
 @SuppressLint("MissingPermission")
-class DeveloperGpsMonitor(context: Context, private val onUpdate: (DevGpsState) -> Unit) {
+class DeveloperGpsMonitor(private val context: Context, private val onUpdate: (DevGpsState) -> Unit) {
     private var state = DevGpsState()
-    private val fused = LocationServices.getFusedLocationProviderClient(context)
     private val locationManager = context.getSystemService<LocationManager>()
 
-    private val locationCallback = object : LocationCallback() {
-        override fun onLocationResult(result: LocationResult) {
-            val loc = result.lastLocation ?: return
-            state = state.copy(location = loc)
-            onUpdate(state)
-        }
+    private val locationMonitor = RawGps.Monitor(minTimeMs = 1_000L) { loc ->
+        state = state.copy(location = loc)
+        onUpdate(state)
     }
 
     private val gnssCallback = object : GnssStatus.Callback() {
@@ -74,15 +64,12 @@ class DeveloperGpsMonitor(context: Context, private val onUpdate: (DevGpsState) 
     }
 
     fun start() {
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
-            .setMinUpdateIntervalMillis(500L)
-            .build()
-        fused.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+        locationMonitor.start(context)
         locationManager?.registerGnssStatusCallback(gnssCallback, null)
     }
 
     fun stop() {
-        fused.removeLocationUpdates(locationCallback)
+        locationMonitor.stop()
         locationManager?.unregisterGnssStatusCallback(gnssCallback)
     }
 

@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.Looper
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -19,11 +18,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.asnidev.trailkeeperoffgrid.MainActivity
 import com.asnidev.trailkeeperoffgrid.R
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
+import com.asnidev.trailkeeperoffgrid.location.RawGps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,28 +28,23 @@ import kotlinx.coroutines.launch
 
 /**
  * Foreground service that keeps GPS running while a route is being recorded,
- * even with the app backgrounded. It owns the fused-location client and the
+ * even with the app backgrounded. It owns the raw-GPS monitor and the
  * ongoing notification; all recording state lives in [TrackRecorder].
  */
 @SuppressLint("MissingPermission") // service is only started after the
 // location + notification permissions have been granted in the UI.
 class TrackRecordingService : Service() {
-    private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var notifJob: Job? = null
 
-    private val callback =
-        object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                val loc = result.lastLocation ?: return
-                TrackRecorder.onLocation(
-                    loc.latitude,
-                    loc.longitude,
-                    if (loc.hasAltitude()) loc.altitude else null,
-                    if (loc.hasAccuracy()) loc.accuracy else 999f,
-                )
-            }
-        }
+    private val monitor = RawGps.Monitor(minTimeMs = 3_000L, minDistanceM = 2f) { loc ->
+        TrackRecorder.onLocation(
+            loc.latitude,
+            loc.longitude,
+            if (loc.hasAltitude()) loc.altitude else null,
+            if (loc.hasAccuracy()) loc.accuracy else 999f,
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -92,18 +82,12 @@ class TrackRecordingService : Service() {
 
     // --- location --------------------------------------------------------
 
-    @SuppressLint("MissingPermission")
     private fun requestUpdates() {
-        val request =
-            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3_000L)
-                .setMinUpdateIntervalMillis(2_000L)
-                .setMinUpdateDistanceMeters(2f)
-                .build()
-        fused.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        monitor.start(this)
     }
 
     private fun stopUpdates() {
-        runCatching { fused.removeLocationUpdates(callback) }
+        monitor.stop()
     }
 
     private fun stopEverything() {

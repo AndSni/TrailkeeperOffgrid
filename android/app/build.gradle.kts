@@ -30,8 +30,8 @@ android {
         applicationId = "com.trailkeeperoffgrid.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.3.2"
+        versionCode = 11
+        versionName = "0.3.3"
         // No API base URLs: Trailkeeper Offgrid has no backend. The only
         // network use is the optional map-region download and update check
         // (see docs/BLUEPRINT.md sec 5 / 7.6), which use absolute URLs.
@@ -113,7 +113,10 @@ dependencies {
     // MapLibre Native - vector map, trail/task overlays, the GPS puck.
     // Offline .pmtiles tiles are the next slice (docs/BLUEPRINT.md sec 5).
     implementation("org.maplibre.gl:android-sdk:11.8.0")
-    implementation("com.google.android.gms:play-services-location:21.3.0")
+    // No Play Services location dependency: this app must work flawlessly
+    // off-grid, so every GPS fix (map puck, track recording, one-shot
+    // marking, Developer options) goes straight through android.location's
+    // LocationManager GPS_PROVIDER - see location/RawGps.kt.
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

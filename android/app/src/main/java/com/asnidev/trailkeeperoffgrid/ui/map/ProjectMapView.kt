@@ -23,7 +23,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,15 +43,14 @@ import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
+import com.asnidev.trailkeeperoffgrid.location.RawGps
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
-import org.maplibre.android.location.engine.LocationEngineRequest
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
@@ -83,6 +81,10 @@ private class MapHolder {
     var style: Style? = null
     var fittedCamera = false
     var lastFocusNonce = 0L
+    /** True once enableLocation() has activated the LocationComponent - a
+     * forceLocationUpdate() call before that throws, and a GPS fix can
+     * easily arrive before the (async) style/location setup finishes. */
+    var locationReady = false
 }
 
 @Composable
@@ -117,20 +119,25 @@ fun ProjectMap(
     var trackingMode by remember { mutableIntStateOf(CameraMode.NONE) }
     var accuracyM by remember { mutableStateOf<Float?>(null) }
 
-    // Polls the same location stream that draws the blue dot / accuracy
-    // circle, rather than a separate raw-GNSS registration - that way the
-    // indicator can never disagree with what's actually on the map, and
-    // there's no second location subscription to keep alive.
-    LaunchedEffect(hasLocationPermission) {
-        if (!hasLocationPermission) {
+    // MapLibre's own default location engine mixes in the coarse
+    // NETWORK_PROVIDER alongside GPS with no preference for the better
+    // source (confirmed by decompiling it) - that's what made the blue dot
+    // float at 17-40m instead of the single-digit accuracy Developer
+    // options gets. So the map takes no part in sourcing its own location:
+    // enableLocation() below disables MapLibre's engine entirely
+    // (useDefaultLocationEngine(false)) and this feeds it pure-GNSS fixes
+    // directly via forceLocationUpdate, same as everywhere else in the app.
+    DisposableEffect(hasLocationPermission) {
+        val monitor = if (hasLocationPermission) {
+            RawGps.Monitor(minTimeMs = 1_000L) { loc ->
+                accuracyM = loc.takeIf { it.hasAccuracy() }?.accuracy
+                if (holder.locationReady) holder.map?.locationComponent?.forceLocationUpdate(loc)
+            }.also { it.start(context) }
+        } else {
             accuracyM = null
-            return@LaunchedEffect
+            null
         }
-        while (true) {
-            accuracyM = holder.map?.locationComponent?.lastKnownLocation
-                ?.takeIf { it.hasAccuracy() }?.accuracy
-            delay(1_000L)
-        }
+        onDispose { monitor?.stop() }
     }
 
     val mapView = remember {
@@ -235,6 +242,7 @@ fun ProjectMap(
                         )
                     )
                     enableLocation(context, map, style, hasLocationPermission) { trackingMode = it }
+                    holder.locationReady = hasLocationPermission
                     pushData(
                         holder, trails, tasks, structures, tracks, reports,
                         projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
@@ -458,17 +466,13 @@ private fun enableLocation(
 ) {
     if (!hasPermission) return
     val lc = map.locationComponent
-    // The default engine request favours battery over accuracy, which is
-    // what made the on-map "blue dot" (and anything marked from it) lag
-    // metres behind an actual GPS fix - force a real GPS-backed one instead.
-    val request = LocationEngineRequest.Builder(1_000L)
-        .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
-        .setFastestInterval(500L)
-        .build()
+    // MapLibre's own engine is disabled here - the puck is fed pure-GNSS
+    // fixes directly via forceLocationUpdate() (see ProjectMap's
+    // DisposableEffect), because that default engine mixes in the coarse
+    // NETWORK_PROVIDER with no preference for the better source.
     lc.activateLocationComponent(
         LocationComponentActivationOptions.builder(context, style)
-            .locationEngineRequest(request)
-            .useDefaultLocationEngine(true)
+            .useDefaultLocationEngine(false)
             .build()
     )
     lc.isLocationComponentEnabled = true

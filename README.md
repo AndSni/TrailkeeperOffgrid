@@ -25,6 +25,29 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.3** fixes a real accuracy gap: on the map, GPS accuracy floated at
+±17-40m and struggled to settle, while Developer options (a separate code
+path) converged to ±3-10m within seconds. Decompiling MapLibre's own
+`LocationComponent` found the cause — despite the name, its default
+"MapLibreFused" engine is not Google's fused provider; it's raw
+`android.location.LocationManager`, and for high-accuracy requests it
+registers **both** `GPS_PROVIDER` and the coarse `NETWORK_PROVIDER`
+simultaneously with no preference for the better source, so a stale/weak
+WiFi-based fix could just as easily land on the puck as a good GPS one.
+
+Rather than pick a different arbitration scheme, every GPS source in the
+app — the map puck, track recording, one-shot "mark here" capture, and
+Developer options — now runs through one shared, pure-GNSS pipeline
+(`location/RawGps.kt`) built directly on `LocationManager.GPS_PROVIDER`.
+No Play Services, no network-based positioning anywhere: the same
+category of source a dedicated handheld GPS unit uses, appropriate for
+an app that has to work flawlessly with zero connectivity. The
+`play-services-location` dependency and the `ACCESS_COARSE_LOCATION`
+permission are gone entirely - nothing in the app requests network-based
+location any more. The map's puck is fed via MapLibre's
+`LocationComponent.forceLocationUpdate()` with `useDefaultLocationEngine
+(false)`, so MapLibre no longer sources its own location at all.
+
 **v0.3.2** fixes the map's GPS signal indicator, which never lit up: it
 read satellite status from a separate raw-GNSS registration that could
 end up with no events at all if the fix was actually coming from a
