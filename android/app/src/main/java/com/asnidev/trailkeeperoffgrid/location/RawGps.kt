@@ -89,7 +89,14 @@ object RawGps {
             m.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER, minTimeMs, minDistanceM, listener, Looper.getMainLooper()
             )
-            m.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let(onLocation)
+            // Deliberately not seeding from getLastKnownLocation(): that's
+            // Android's system-wide location cache and can be hours or days
+            // old, from wherever the device last got a fix. Showing that as
+            // if it were current is exactly the "full bars indoors with no
+            // satellites in fix" bug - a real GPS unit shows "acquiring"
+            // until it actually has one, never a leftover reading from last
+            // time. Every consumer's own "no fix yet" default (null state)
+            // holds until a genuine onLocationChanged fires.
         }
 
         fun stop() {

@@ -25,6 +25,19 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.4** fixes a bug v0.3.3's rewrite introduced: `RawGps.Monitor`
+seeded its very first reading from `LocationManager.getLastKnownLocation()`
+— Android's system-wide location cache, which can be hours or days old,
+from wherever the device last got a fix. That made the map's accuracy
+indicator show full bars indoors with zero satellites actually in fix
+(and the puck could appear at a stale, unrelated position). A real GPS
+unit shows "acquiring" until it actually has signal, never a leftover
+reading from last time — so that seed is gone. Every consumer (map,
+track recording, Developer options) now starts from its own "no fix yet"
+state and stays there until a genuine live fix arrives. This also fixes
+a latent correctness bug in track recording, where a stale cached point
+could have been spliced into the start of a route.
+
 **v0.3.3** fixes a real accuracy gap: on the map, GPS accuracy floated at
 ±17-40m and struggled to settle, while Developer options (a separate code
 path) converged to ±3-10m within seconds. Decompiling MapLibre's own
