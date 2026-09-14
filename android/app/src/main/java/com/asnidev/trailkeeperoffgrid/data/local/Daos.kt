@@ -125,6 +125,23 @@ interface StructureDao {
     suspend fun listForOrg(orgId: String): List<StructureEntity>
 
     @Query("DELETE FROM structures WHERE id = :id") suspend fun deleteById(id: String)
+
+    @Query("UPDATE structures SET structureType = :newType WHERE structureType = :oldType")
+    suspend fun renameType(oldType: String, newType: String)
+}
+
+@Dao
+interface StructureTypeDao {
+    @Upsert suspend fun upsert(row: StructureTypeEntity)
+
+    @Query("SELECT * FROM structure_types ORDER BY sortOrder ASC")
+    fun observeAll(): Flow<List<StructureTypeEntity>>
+
+    @Query("SELECT * FROM structure_types WHERE key = :key") suspend fun getByKey(key: String): StructureTypeEntity?
+
+    @Query("SELECT MAX(sortOrder) FROM structure_types") suspend fun maxSortOrder(): Int?
+
+    @Query("DELETE FROM structure_types WHERE key = :key") suspend fun deleteByKey(key: String)
 }
 
 @Dao

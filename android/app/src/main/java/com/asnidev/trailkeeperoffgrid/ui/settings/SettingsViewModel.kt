@@ -10,9 +10,8 @@ import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 import com.asnidev.trailkeeperoffgrid.data.Reminders
 import com.asnidev.trailkeeperoffgrid.data.local.ProjectEntity
-import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
+import com.asnidev.trailkeeperoffgrid.data.local.StructureTypeEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
-import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -69,10 +68,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         TrailkeeperDb.db.projectDao().observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // Structures are org-wide (not tied to one project), so they need a
-    // place to browse/edit them all regardless of which project is open.
-    val structures: StateFlow<List<StructureEntity>> =
-        TrailkeeperDb.db.structureDao().observeForOrg(Identity.ORG_ID)
+    val structureTypes: StateFlow<List<StructureTypeEntity>> =
+        TrailkeeperDb.db.structureTypeDao().observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -223,17 +220,24 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun patchStructure(id: String, req: StructurePatchRequest) {
+    fun addStructureType(label: String) {
         viewModelScope.launch {
-            runCatching { LocalStore.updateStructure(id, req) }
-                .onFailure { e -> _message.value = e.message ?: "Couldn't update the structure" }
+            runCatching { LocalStore.addStructureType(label) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't add the type" }
         }
     }
 
-    fun deleteStructure(id: String) {
+    fun renameStructureType(key: String, label: String) {
         viewModelScope.launch {
-            runCatching { LocalStore.deleteStructure(id) }
-                .onFailure { e -> _message.value = e.message ?: "Couldn't delete the structure" }
+            runCatching { LocalStore.renameStructureType(key, label) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't rename the type" }
+        }
+    }
+
+    fun deleteStructureType(key: String) {
+        viewModelScope.launch {
+            runCatching { LocalStore.deleteStructureType(key) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't delete the type" }
         }
     }
 

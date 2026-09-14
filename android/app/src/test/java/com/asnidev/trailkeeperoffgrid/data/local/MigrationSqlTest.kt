@@ -7,26 +7,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Verifies [TrailkeeperDb.MIGRATION_1_2] against a real SQLite engine
- * (`org.xerial:sqlite-jdbc`) rather than Room's `MigrationTestHelper`,
- * which needs Robolectric/instrumentation and was tried first but is far
- * too slow to run in this environment / CI (see `TrailkeeperDb.kt`'s doc
- * comment). This is a plain JVM unit test — no Android runtime, fast.
+ * Verifies [TrailkeeperDb.MIGRATION_1_2] and [TrailkeeperDb.MIGRATION_2_3]
+ * against a real SQLite engine (`org.xerial:sqlite-jdbc`) rather than
+ * Room's `MigrationTestHelper`, which needs Robolectric/instrumentation and
+ * was tried first but is far too slow to run in this environment / CI (see
+ * `TrailkeeperDb.kt`'s doc comment). This is a plain JVM unit test — no
+ * Android runtime, fast.
  *
  * [V1_CREATE_TABLE] is the full, **frozen** v1 schema: one `CREATE TABLE`
  * per entity, copied verbatim from
  * `app/schemas/com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb/1.json`
  * (Room's `${'$'}{TABLE_NAME}` placeholder substituted with the real name).
  * v1 never changes again by definition — a schema bump always ships as a
- * new version — so hardcoding it here carries no drift risk. The migration
- * itself is run via the exact same [TrailkeeperDb.CREATE_TRAIL_REPORTS_V2]
- * string the app ships, not a copy.
+ * new version — so hardcoding it here carries no drift risk. Each migration
+ * itself is run via the exact same SQL/DML string(s) the app ships
+ * ([TrailkeeperDb.CREATE_TRAIL_REPORTS_V2],
+ * [TrailkeeperDb.CREATE_STRUCTURE_TYPES_V3] +
+ * [TrailkeeperDb.SEED_STRUCTURE_TYPES_V3]), not a copy.
  */
 class MigrationSqlTest {
 
     private fun freshV1Connection(): Connection {
         val conn = DriverManager.getConnection("jdbc:sqlite::memory:")
         conn.createStatement().use { st -> V1_CREATE_TABLE.values.forEach { st.execute(it) } }
+        return conn
+    }
+
+    /** v1 schema + [TrailkeeperDb.MIGRATION_1_2]'s DDL already applied. */
+    private fun freshV2Connection(): Connection {
+        val conn = freshV1Connection()
+        conn.createStatement().use { it.execute(TrailkeeperDb.CREATE_TRAIL_REPORTS_V2) }
         return conn
     }
 
@@ -90,6 +100,82 @@ class MigrationSqlTest {
                 val rs = st.executeQuery("SELECT COUNT(*) FROM trail_reports")
                 rs.next()
                 assertEquals(1, rs.getInt(1))
+            }
+        }
+    }
+
+    private fun applyMigration2To3(conn: Connection) {
+        conn.createStatement().use { it.execute(TrailkeeperDb.CREATE_STRUCTURE_TYPES_V3) }
+        TrailkeeperDb.SEED_STRUCTURE_TYPES_V3.forEachIndexed { i, key ->
+            conn.prepareStatement(
+                "INSERT OR IGNORE INTO structure_types (`key`, sortOrder) VALUES (?, ?)"
+            ).use { ps ->
+                ps.setString(1, key)
+                ps.setInt(2, i)
+                ps.executeUpdate()
+            }
+        }
+    }
+
+    @Test
+    fun migrate2To3_addsStructureTypes_withTheExactShipSchema() {
+        freshV2Connection().use { conn ->
+            applyMigration2To3(conn)
+
+            assertEquals(V1_CREATE_TABLE.keys + "trail_reports" + "structure_types", tableNames(conn))
+            assertEquals(EXPECTED_STRUCTURE_TYPES_COLUMNS, columnInfo(conn, "structure_types"))
+        }
+    }
+
+    @Test
+    fun migrate2To3_seedsTheOriginalHardcodedTypeList_inOrder() {
+        freshV2Connection().use { conn ->
+            applyMigration2To3(conn)
+
+            conn.createStatement().use { st ->
+                val rs = st.executeQuery("SELECT `key` FROM structure_types ORDER BY sortOrder ASC")
+                val seen = mutableListOf<String>()
+                while (rs.next()) seen.add(rs.getString(1))
+                assertEquals(TrailkeeperDb.SEED_STRUCTURE_TYPES_V3, seen)
+            }
+        }
+    }
+
+    @Test
+    fun migrate2To3_seedIsIdempotent() {
+        // A migration only ever runs once, as part of opening the db at a
+        // new version - but a retried/interrupted run (e.g. app killed
+        // mid-migration) must not fail or duplicate rows on its next try.
+        freshV2Connection().use { conn ->
+            applyMigration2To3(conn)
+            applyMigration2To3(conn)
+
+            conn.createStatement().use { st ->
+                val rs = st.executeQuery("SELECT COUNT(*) FROM structure_types")
+                rs.next()
+                assertEquals(TrailkeeperDb.SEED_STRUCTURE_TYPES_V3.size, rs.getInt(1))
+            }
+        }
+    }
+
+    @Test
+    fun migrate2To3_preservesExistingStructures() {
+        freshV2Connection().use { conn ->
+            conn.createStatement().use { st ->
+                st.execute(
+                    "INSERT INTO structures (id, organisationId, name, structureType, status, " +
+                        "geometryJson, nearestTrailId, material, color, installedOn, " +
+                        "inspectionIntervalDays, notes) VALUES ('s1', 'local', 'Culvert 1', " +
+                        "'culvert', 'good', NULL, NULL, '', '', NULL, NULL, '')"
+                )
+            }
+
+            applyMigration2To3(conn)
+
+            conn.createStatement().use { st ->
+                val rs = st.executeQuery("SELECT name FROM structures WHERE id = 's1'")
+                assertTrue("the pre-migration structure row must survive", rs.next())
+                assertEquals("Culvert 1", rs.getString(1))
             }
         }
     }
@@ -160,6 +246,13 @@ class MigrationSqlTest {
             Col("reportedById", "TEXT", notNull = false, pk = 0),
             Col("createdAt", "TEXT", notNull = true, pk = 0),
             Col("resolvedAt", "TEXT", notNull = false, pk = 0),
+        )
+
+        // Column order + notNull/pk, straight from
+        // app/schemas/.../3.json's `structure_types` entity.
+        val EXPECTED_STRUCTURE_TYPES_COLUMNS = listOf(
+            Col("key", "TEXT", notNull = true, pk = 1),
+            Col("sortOrder", "INTEGER", notNull = true, pk = 0),
         )
     }
 }

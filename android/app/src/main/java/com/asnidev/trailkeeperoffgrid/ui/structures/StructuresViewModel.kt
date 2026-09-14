@@ -7,6 +7,7 @@ import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionEntity
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionFormEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
+import com.asnidev.trailkeeperoffgrid.data.local.StructureTypeEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
 import com.asnidev.trailkeeperoffgrid.model.InspectionCreateRequest
 import com.asnidev.trailkeeperoffgrid.model.InspectionFieldDto
@@ -23,10 +24,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-val STRUCTURE_TYPES = listOf(
-    "culvert", "bridge", "boardwalk", "ford", "steps", "retaining_wall",
-    "drain", "waterbar", "sign", "gate", "bench", "kiosk", "other",
-)
 val STRUCTURE_STATUSES = listOf("good", "monitor", "needs_repair", "failed", "decommissioned")
 val INSPECTION_RISKS = listOf("low", "medium", "high", "critical")
 // "" = client default; the rest are picker presets.
@@ -50,6 +47,10 @@ class StructuresViewModel(private val projectId: String) : ViewModel() {
 
     val structures: StateFlow<List<StructureEntity>> =
         db.structureDao().observeForOrg(orgId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val structureTypes: StateFlow<List<StructureTypeEntity>> =
+        db.structureTypeDao().observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val forms: StateFlow<List<InspectionFormEntity>> =

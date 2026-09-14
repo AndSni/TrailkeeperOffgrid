@@ -24,6 +24,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *
  * ## Migration history
  * - v1 → v2: add `trail_reports` (P5 trail-condition reports).
+ * - v2 → v3: add `structure_types` (editable structure-type taxonomy,
+ *   seeded with the app's original hardcoded list; `"other"` is the
+ *   permanent fallback a deleted type's structures get reassigned to).
  */
 @Database(
     entities = [
@@ -41,8 +44,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         InspectionEntity::class,
         TrailReportEntity::class,
         TrackEntity::class,
+        StructureTypeEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class TrailkeeperDb : RoomDatabase() {
@@ -60,6 +64,7 @@ abstract class TrailkeeperDb : RoomDatabase() {
     abstract fun inspectionDao(): InspectionDao
     abstract fun trailReportDao(): TrailReportDao
     abstract fun trackDao(): TrackDao
+    abstract fun structureTypeDao(): StructureTypeDao
     abstract fun backupDao(): BackupDao
 
     companion object {
@@ -89,7 +94,48 @@ abstract class TrailkeeperDb : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+        /** The exact DDL [MIGRATION_2_3] runs to create the table itself -
+         * the seed rows are separate ([SEED_STRUCTURE_TYPES_V3]) since they're
+         * DML, not part of the schema `MigrationSqlTest` checks against
+         * `3.json`. */
+        const val CREATE_STRUCTURE_TYPES_V3: String =
+            "CREATE TABLE IF NOT EXISTS `structure_types` (" +
+                "`key` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`key`))"
+
+        /** The original hardcoded `STRUCTURE_TYPES` list, in its original
+         * order, becoming the seed data for the new editable table. */
+        val SEED_STRUCTURE_TYPES_V3: List<String> = listOf(
+            "culvert", "bridge", "boardwalk", "ford", "steps", "retaining_wall",
+            "drain", "waterbar", "sign", "gate", "bench", "kiosk", "other",
+        )
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(CREATE_STRUCTURE_TYPES_V3)
+                SEED_STRUCTURE_TYPES_V3.forEachIndexed { i, key ->
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO structure_types (`key`, sortOrder) VALUES (?, ?)",
+                        arrayOf<Any>(key, i),
+                    )
+                }
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+
+        /** A brand-new install creates `structure_types` straight from the
+         * entity (no migration runs), so it still needs seeding here. */
+        private val SEED_ON_CREATE = object : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                SEED_STRUCTURE_TYPES_V3.forEachIndexed { i, key ->
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO structure_types (`key`, sortOrder) VALUES (?, ?)",
+                        arrayOf<Any>(key, i),
+                    )
+                }
+            }
+        }
 
         @Volatile private var built: TrailkeeperDb? = null
 
@@ -112,6 +158,7 @@ abstract class TrailkeeperDb : RoomDatabase() {
                                 "trailkeeper_offgrid.db",
                             )
                             .addMigrations(*ALL_MIGRATIONS)
+                            .addCallback(SEED_ON_CREATE)
                             .build()
                             .also { built = it }
                 }

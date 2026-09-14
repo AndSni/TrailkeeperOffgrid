@@ -70,6 +70,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 @Composable
 fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
     val structures by vm.structures.collectAsState()
+    val structureTypes by vm.structureTypes.collectAsState()
     val forms by vm.forms.collectAsState()
     val inspections by vm.inspections.collectAsState()
     val saving by vm.saving.collectAsState()
@@ -100,6 +101,7 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
         AddStructureForm(
             name = addName, onName = { addName = it },
             type = addType, onType = { addType = it },
+            types = structureTypes.map { it.key },
             material = addMaterial, onMaterial = { addMaterial = it },
             notes = addNotes, onNotes = { addNotes = it },
             color = addColor, onColor = { addColor = it },
@@ -212,6 +214,7 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
     editingStructure?.let { s ->
         EditStructureDialog(
             structure = s,
+            types = structureTypes.map { it.key },
             onDismiss = { editingStructure = null },
             onSave = { req -> vm.patchStructure(s.id, req); editingStructure = null },
             onDelete = { vm.deleteStructure(s.id); editingStructure = null },
@@ -381,11 +384,10 @@ private fun formatInspectedOn(iso: String): String =
             .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm"))
     }.getOrDefault(iso.take(16).replace('T', ' '))
 
-/** Reused from the Structures tab (hold a card) and Settings' "Manage
- * structures" screen (structures are org-wide, not project-scoped). */
 @Composable
 fun EditStructureDialog(
     structure: StructureEntity,
+    types: List<String>,
     onDismiss: () -> Unit,
     onSave: (StructurePatchRequest) -> Unit,
     onDelete: () -> Unit,
@@ -419,7 +421,7 @@ fun EditStructureDialog(
                     Box {
                         OutlinedButton(onClick = { typeMenu = true }) { Text(type.replace('_', ' ')) }
                         DropdownMenu(expanded = typeMenu, onDismissRequest = { typeMenu = false }) {
-                            STRUCTURE_TYPES.forEach { t ->
+                            types.forEach { t ->
                                 DropdownMenuItem(
                                     text = { Text(t.replace('_', ' ')) },
                                     onClick = { type = t; typeMenu = false },
@@ -574,6 +576,7 @@ private fun EditInspectionDialog(
 private fun AddStructureForm(
     name: String, onName: (String) -> Unit,
     type: String, onType: (String) -> Unit,
+    types: List<String>,
     material: String, onMaterial: (String) -> Unit,
     notes: String, onNotes: (String) -> Unit,
     color: String, onColor: (String) -> Unit,
@@ -600,7 +603,7 @@ private fun AddStructureForm(
         Box {
             OutlinedButton(onClick = { typeMenu = true }) { Text(type.replace('_', ' ')) }
             DropdownMenu(expanded = typeMenu, onDismissRequest = { typeMenu = false }) {
-                STRUCTURE_TYPES.forEach { t ->
+                types.forEach { t ->
                     DropdownMenuItem(
                         text = { Text(t.replace('_', ' ')) },
                         onClick = { onType(t); typeMenu = false },

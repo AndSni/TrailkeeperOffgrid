@@ -7,6 +7,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.MessageEntity
 import com.asnidev.trailkeeperoffgrid.data.local.ProjectEntity
 import com.asnidev.trailkeeperoffgrid.data.local.SegmentWorkEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
+import com.asnidev.trailkeeperoffgrid.data.local.StructureTypeEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
@@ -367,6 +368,47 @@ object LocalStore {
     }
 
     suspend fun deleteStructure(id: String) = db.structureDao().deleteById(id)
+
+    // ---- structure-type taxonomy ------------------------------------
+
+    private fun slugifyTypeKey(label: String): String =
+        label.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+
+    suspend fun addStructureType(label: String) {
+        val key = slugifyTypeKey(label)
+        require(key.isNotBlank()) { "Type name can't be empty" }
+        require(db.structureTypeDao().getByKey(key) == null) { "\"$label\" already exists" }
+        val next = (db.structureTypeDao().maxSortOrder() ?: -1) + 1
+        db.structureTypeDao().upsert(StructureTypeEntity(key, next))
+    }
+
+    /** Renaming changes the stable key too, so it cascades to every
+     * structure currently using the old one. */
+    suspend fun renameStructureType(oldKey: String, label: String) {
+        require(oldKey != "other") { "\"Other\" can't be renamed" }
+        val newKey = slugifyTypeKey(label)
+        require(newKey.isNotBlank()) { "Type name can't be empty" }
+        if (newKey == oldKey) return
+        require(db.structureTypeDao().getByKey(newKey) == null) { "\"$label\" already exists" }
+        val row = db.structureTypeDao().getByKey(oldKey) ?: return
+        db.withTransaction {
+            db.structureDao().renameType(oldKey, newKey)
+            db.structureTypeDao().deleteByKey(oldKey)
+            db.structureTypeDao().upsert(
+                StructureTypeEntity(newKey, row.sortOrder)
+            )
+        }
+    }
+
+    /** Its structures fall back to "other" rather than being left with a
+     * type that no longer exists in the taxonomy. */
+    suspend fun deleteStructureType(key: String) {
+        require(key != "other") { "\"Other\" can't be deleted" }
+        db.withTransaction {
+            db.structureDao().renameType(key, "other")
+            db.structureTypeDao().deleteByKey(key)
+        }
+    }
 
     // ---- trail-condition reports (P5) ------------------------------
 

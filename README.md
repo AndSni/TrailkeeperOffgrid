@@ -25,6 +25,21 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.1** corrects a misread of v0.3.0's Settings ask:
+
+- **Settings → Structure types** (not "Manage structures", which just
+  duplicated the per-project instance editing below). This is the
+  editable *taxonomy* — culvert, bridge, boardwalk, and so on — the
+  picklist shown when adding/editing a structure. Add, rename or delete
+  a type; `"other"` is a permanent fallback (locked, can't be renamed
+  or deleted) that a deleted type's structures fall back to instead of
+  being left with a dangling value. First schema migration since P5
+  (`structure_types`, DB v2→v3, tested the same way as the v1→v2 one).
+- **Settings → Developer options**: live GPS fix (lat/lon, accuracy,
+  altitude, speed, bearing, provider) plus per-satellite constellation,
+  signal (CN0) and used-in-fix status, sorted strongest-first — for
+  digging into poor-connection field reports.
+
 **v0.3.0** — field-test fixes:
 
 - **Location accuracy.** Every one-shot "where am I" call (marking a task,
@@ -40,9 +55,9 @@ already use on Play; the internal code package stays
   satellites-used-in-fix as 0-4 bars.
 - **Hold to edit.** Structures and inspections now use the same "hold a
   card for 1 second" gesture as project cards, to rename/retype/delete.
-- **Settings → Manage structures**, since structures are shared across
-  every project, not owned by one — a single place to edit or delete any
-  of them regardless of which project is open.
+  (v0.3.0 also put an instance list in Settings under "Manage
+  structures" — corrected in v0.3.1 above, since editing individual
+  structures already happens right here on the Structures tab.)
 - **Inspection dates** are now `dd.MM.yyyy, HH:mm` instead of a raw ISO
   timestamp.
 

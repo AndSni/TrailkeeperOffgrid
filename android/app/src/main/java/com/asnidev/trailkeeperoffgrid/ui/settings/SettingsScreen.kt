@@ -54,9 +54,14 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
         OfflineMapsScreen(vm = vm, onBack = { browsingCountries = false })
         return
     }
-    var managingStructures by rememberSaveable { mutableStateOf(false) }
-    if (managingStructures) {
-        ManageStructuresScreen(vm = vm, onBack = { managingStructures = false })
+    var editingTypes by rememberSaveable { mutableStateOf(false) }
+    if (editingTypes) {
+        StructureTypesScreen(vm = vm, onBack = { editingTypes = false })
+        return
+    }
+    var showingDevOptions by rememberSaveable { mutableStateOf(false) }
+    if (showingDevOptions) {
+        DeveloperOptionsScreen(onBack = { showingDevOptions = false })
         return
     }
 
@@ -90,10 +95,11 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
         ) {
             item { ProfileCard(vm) }
             item { OfflineMapsCard(vm, onBrowseAll = { browsingCountries = true }) }
-            item { StructuresCard(vm, onManage = { managingStructures = true }) }
+            item { StructureTypesCard(onManage = { editingTypes = true }) }
             item { RemindersCard(vm) }
             item { BackupCard(vm) }
             item { StorageCard(vm) }
+            item { DeveloperOptionsCard(onOpen = { showingDevOptions = true }) }
             item { AboutCard() }
         }
     }
@@ -387,17 +393,31 @@ private fun BackupCard(vm: SettingsViewModel) {
 }
 
 @Composable
-private fun StructuresCard(vm: SettingsViewModel, onManage: () -> Unit) {
-    val structures by vm.structures.collectAsState()
-    SectionCard("Structures") {
+private fun StructureTypesCard(onManage: () -> Unit) {
+    SectionCard("Structure types") {
         Text(
-            "Culverts, bridges, signs and more are shared across every project. " +
-                "Rename, retype or delete any of them here.",
+            "Culvert, bridge, boardwalk and the rest of the picklist shown when " +
+                "adding or editing a structure. Add, rename or remove types here.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedButton(onClick = onManage) {
-            Text("Manage structures (${structures.size})")
+            Text("Manage structure types")
+        }
+    }
+}
+
+@Composable
+private fun DeveloperOptionsCard(onOpen: () -> Unit) {
+    SectionCard("Developer options") {
+        Text(
+            "Live GPS position, fix accuracy, and per-satellite signal - for " +
+                "debugging poor-connection reports in the field.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onOpen) {
+            Text("Open developer options")
         }
     }
 }

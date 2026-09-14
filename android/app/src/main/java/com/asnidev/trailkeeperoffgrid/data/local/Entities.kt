@@ -160,6 +160,21 @@ data class StructureEntity(
     val notes: String,
 )
 
+/**
+ * The editable structure-type taxonomy shown in "Add/edit structure" and
+ * managed from Settings → Structure types. [key] is what's actually stored
+ * in [StructureEntity.structureType] (so renaming cascades: the row's key
+ * changes and every structure using the old key is updated to match).
+ * `"other"` is a permanent, undeletable fallback - deleting a type
+ * reassigns its structures to `"other"` rather than leaving them dangling.
+ * Added in DB v3.
+ */
+@Entity(tableName = "structure_types")
+data class StructureTypeEntity(
+    @PrimaryKey val key: String,
+    val sortOrder: Int,
+)
+
 /** A reusable JSON-schema inspection questionnaire (org-wide, versioned).
  * [fieldsJson] is the serialized list of InspectionFieldDto. */
 @Entity(tableName = "inspection_forms")
