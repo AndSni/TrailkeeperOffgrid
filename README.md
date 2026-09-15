@@ -11,11 +11,14 @@ backup zip).
 Derived from [Trailkeeper](https://github.com/AndSni/Trailkeeper). Full plan
 and rationale: [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md).
 
+## License
+
+GPL-3.0 — see [`LICENSE`](LICENSE).
+
 ## Install
 
 No Play Store. Download the APK and open it (allow "install unknown apps"):
 
-- **Latest:** <https://github.com/AndSni/TrailkeeperOffgrid/raw/main/dist/TrailkeeperOffgrid.apk>
 - **Release page:** <https://github.com/AndSni/TrailkeeperOffgrid/releases/latest/download/TrailkeeperOffgrid.apk>
 
 `applicationId com.trailkeeperoffgrid.app` — matches the `com.<name>.app`
@@ -24,6 +27,31 @@ already use on Play; the internal code package stays
 `com.asnidev.trailkeeperoffgrid` (Gradle `namespace`, untouched by this).
 
 ## Status
+
+**v0.3.5** — security and cleanup pass:
+
+- **Backup restore hardened.** Restoring a workspace `.zip` (Settings →
+  Restore backup) trusted the archive's internal file paths and JSON
+  content without checking them: a crafted zip entry name could write
+  outside the app's own `photos/` folder (a classic "Zip Slip" path
+  traversal), and a crafted `photosJson.url` could point the photo grid's
+  read — or its hold-to-delete gesture — at any file the app can reach.
+  Both are now rejected unless they canonically resolve inside the app's
+  own photos directory (`Backup.kt`, `LocalStore.kt`, `TaskPhotos.kt`).
+- **Discussion → Notes.** The project-wide "Discussion" tab — a leftover
+  from multi-user Trailkeeper that never fit a single-user offline app —
+  is gone. The per-task thread stays, since it's genuinely useful as a
+  running note log on a task; it's relabeled "Notes" throughout to match
+  what it actually is.
+- **Keyboard fix.** The Notes composer didn't account for the on-screen
+  keyboard under edge-to-edge (`enableEdgeToEdge()` opts out of the
+  system's automatic resize behavior), so typing a note could shove the
+  input field and message list around, most visibly on a short/empty
+  thread. It now reserves space for the keyboard (`Modifier.imePadding()`)
+  like the rest of the app expects.
+- **Licensed under GPL-3.0** (see `LICENSE`) and release APKs are no
+  longer committed into the repo — see `.github/workflows/release.yml`
+  and the F-Droid note below.
 
 **v0.3.4** fixes a bug v0.3.3's rewrite introduced: `RawGps.Monitor`
 seeded its very first reading from `LocationManager.getLastKnownLocation()`
@@ -151,7 +179,6 @@ Manage structures) or an inspection (inside a structure's detail screen).
 |------|------|
 | `android/` | the app — Kotlin / Jetpack Compose, `minSdk 26` / `targetSdk 36` |
 | `android/app/schemas/` | exported Room schema (committed; version bumps need a migration) |
-| `dist/` | **committed** signed release APKs + `update.json` |
 | `tiles/` | Planetiler recipe + offline-region manifest |
 | `docs/` | the development plan |
 
@@ -180,3 +207,11 @@ storePassword=…
 keyAlias=…
 keyPassword=…
 ```
+
+### F-Droid
+
+Release APKs are attached to GitHub Releases only, never committed into the
+repo — F-Droid builds the APK itself from a tagged commit, and a source
+repo with binaries baked into its history is exactly what that process
+disallows. Each release is tagged (e.g. `v0.3.5`) to give a stable
+inclusion target.

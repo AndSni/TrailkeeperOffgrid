@@ -19,6 +19,3 @@ android/keystore.properties
 # --- Claude Code ---
 .claude/settings.local.json
 .claude/worktrees/
-
-# NOTE: dist/*.apk is deliberately NOT ignored — release APKs are committed
-# so users can install straight from a raw GitHub URL (docs/BLUEPRINT.md 2.3).

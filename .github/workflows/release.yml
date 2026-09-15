@@ -1,9 +1,10 @@
 name: release
 
-# Builds a signed release APK and makes it downloadable two ways:
-#   1. committed into the repo at dist/TrailkeeperOffgrid.apk (raw URL)
-#   2. a rolling GitHub Release tagged `latest`
-# See docs/BLUEPRINT.md sec 2.3.
+# Builds a signed release APK and publishes it as a rolling GitHub Release
+# tagged `latest`. The APK is never committed into the repo — F-Droid builds
+# straight from tagged source, and a repo with binaries baked into its
+# history is exactly what that process disallows. See docs/BLUEPRINT.md
+# sec 2.3.
 #
 # Signing secrets (optional — without them the APK is debug-signed but still
 # installs):
@@ -67,7 +68,7 @@ jobs:
         working-directory: android
         run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Stage APK into dist/ + refresh update.json
+      - name: Stage APK for release
         id: stage
         run: |
           set -e
@@ -76,41 +77,8 @@ jobs:
           VCODE=$(grep -oP 'versionCode = \K[0-9]+' android/app/build.gradle.kts)
           echo "vname=$VNAME" >> "$GITHUB_OUTPUT"
           echo "vcode=$VCODE" >> "$GITHUB_OUTPUT"
-          mkdir -p dist
-          cp "$APK" "dist/TrailkeeperOffgrid.apk"
-          cp "$APK" "dist/TrailkeeperOffgrid-${VNAME}-${VCODE}.apk"
-          cat > dist/update.json <<EOF
-          {
-            "versionCode": ${VCODE},
-            "versionName": "${VNAME}",
-            "apkUrl": "https://github.com/${GITHUB_REPOSITORY}/raw/main/dist/TrailkeeperOffgrid.apk",
-            "changelog": "Build from ${GITHUB_SHA}"
-          }
-          EOF
-
-      - name: Commit APK back to the repo
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dist/
-          if git diff --cached --quiet; then
-            echo "dist/ unchanged."
-            exit 0
-          fi
-          git commit -m "release: APK ${{ steps.stage.outputs.vname }} (${{ steps.stage.outputs.vcode }}) [skip ci]"
-          # main can move (another push, or this workflow racing its own
-          # prior run) between checkout and here — rebase onto the tip and
-          # retry a few times rather than failing the whole job.
-          for attempt in 1 2 3 4 5; do
-            if git push; then
-              exit 0
-            fi
-            echo "push rejected (attempt $attempt) — fetching + rebasing onto origin/main"
-            git fetch origin main
-            git rebase origin/main
-          done
-          echo "::error::Could not push dist/ after 5 attempts"
-          exit 1
+          mkdir -p release-artifacts
+          cp "$APK" "release-artifacts/TrailkeeperOffgrid.apk"
 
       - name: Publish rolling 'latest' release
         env:
@@ -118,6 +86,6 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest \
-            "dist/TrailkeeperOffgrid.apk" \
+            "release-artifacts/TrailkeeperOffgrid.apk" \
             --title "Latest (${{ steps.stage.outputs.vname }})" \
             --notes "Rolling build of \`main\`. Install: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/TrailkeeperOffgrid.apk"
