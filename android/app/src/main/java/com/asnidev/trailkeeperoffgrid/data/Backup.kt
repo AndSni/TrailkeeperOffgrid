@@ -180,10 +180,13 @@ object Backup {
                     json["trail_reports"]?.let { db.trailReportDao().upsertAll(list<TrailReportEntity>(it)) }
                 }
 
-                val photoRoot = File(context.getExternalFilesDir(null), "photos")
+                val photoRoot = File(context.getExternalFilesDir(null), "photos").canonicalFile
                 if (replace) runCatching { photoRoot.deleteRecursively() }
                 for ((rel, bytes) in photos) {
-                    val out = File(photoRoot, rel)
+                    val out = File(photoRoot, rel).canonicalFile
+                    if (!out.path.startsWith(photoRoot.path + File.separator)) {
+                        continue // zip entry tries to write outside photos/ - reject it
+                    }
                     out.parentFile?.mkdirs()
                     out.writeBytes(bytes)
                 }

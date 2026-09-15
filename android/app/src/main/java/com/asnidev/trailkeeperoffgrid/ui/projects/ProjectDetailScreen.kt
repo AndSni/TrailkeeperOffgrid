@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -130,7 +131,6 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                 .observeForOrg(com.asnidev.trailkeeperoffgrid.data.Identity.ORG_ID)
         }
             .collectAsState(initial = emptyList())
-    val messages by vm.discussion.collectAsState()
     val commentCounts by vm.taskCommentCounts.collectAsState()
     val unreadCommentTasks by vm.unreadCommentTasks.collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -150,7 +150,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
     var editingTask by remember { mutableStateOf<TaskEntity?>(null) }
     var movingTask by remember { mutableStateOf<TaskEntity?>(null) }
     var movingStructure by remember { mutableStateOf<StructureEntity?>(null) }
-    var discussingTask by remember { mutableStateOf<TaskEntity?>(null) }
+    var notingTask by remember { mutableStateOf<TaskEntity?>(null) }
 
     fun geomLatLon(json: String?): Pair<Double, Double>? =
         runCatching {
@@ -179,7 +179,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
         }
     val requestNotifications =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    // Tab order: 0 Tasks · 1 Map · 2 Route · 3 Trails · 4 Work · 5 Structures · 6 Discussion
+    // Tab order: 0 Tasks · 1 Map · 2 Route · 3 Trails · 4 Work · 5 Structures
     LaunchedEffect(tab) {
         if (tab in intArrayOf(1, 2, 3, 4, 5) && !hasLocation) {
             requestLocation.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -236,25 +236,24 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                 Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Trails") })
                 Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("Work") })
                 Tab(selected = tab == 5, onClick = { tab = 5 }, text = { Text("Structures") })
-                Tab(selected = tab == 6, onClick = { tab = 6 }, text = { Text("Discussion") })
             }
 
             Box(Modifier.fillMaxSize()) {
                 val moveTask = movingTask
                 val moveStructure = movingStructure
-                val chatTask = discussingTask
+                val noteTask = notingTask
                 when {
                     !s.loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    chatTask != null -> {
+                    noteTask != null -> {
                         val rows by
-                            remember(chatTask.id) { vm.taskThread(chatTask.id) }
+                            remember(noteTask.id) { vm.taskThread(noteTask.id) }
                                 .collectAsState(initial = emptyList())
-                        TaskDiscussionScreen(
-                            taskTitle = chatTask.title,
-                            messages = rows,
-                            onSend = { vm.postMessage(it, taskId = chatTask.id) },
+                        TaskNotesScreen(
+                            taskTitle = noteTask.title,
+                            notes = rows,
+                            onSend = { vm.postMessage(it, taskId = noteTask.id) },
                             onDelete = vm::deleteMessage,
-                            onBack = { discussingTask = null },
+                            onBack = { notingTask = null },
                         )
                     }
                     moveTask != null ->
@@ -330,13 +329,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                             onOpen = { tr -> selected = "trail" to tr.id; focusOnMap(tr.geometryJson) },
                         )
                     tab == 4 -> SegmentWorkTab(workVm, s.trails, hasLocation)
-                    tab == 5 -> StructuresTab(structuresVm, hasLocation)
-                    else ->
-                        DiscussionTab(
-                            messages,
-                            onSend = { vm.postMessage(it) },
-                            onDelete = vm::deleteMessage,
-                        )
+                    else -> StructuresTab(structuresVm, hasLocation)
                 }
             }
         }
@@ -381,9 +374,9 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                                     vm.setStatus(task.id, if (task.status == "done") "open" else "done")
                                 },
                                 onMove = { movingTask = task; selected = null },
-                                onDiscuss = {
+                                onOpenNotes = {
                                     vm.markTaskCommentsRead(task.id)
-                                    discussingTask = task
+                                    notingTask = task
                                     selected = null
                                 },
                                 onUploadPhoto = { file -> vm.uploadTaskPhoto(task.id, file) },
@@ -454,7 +447,7 @@ private fun TaskDetailBody(
     onEdit: () -> Unit,
     onToggleDone: () -> Unit,
     onMove: () -> Unit,
-    onDiscuss: () -> Unit,
+    onOpenNotes: () -> Unit,
     onUploadPhoto: (java.io.File) -> Unit,
     onDeletePhoto: (String) -> Unit,
 ) {
@@ -481,7 +474,7 @@ private fun TaskDetailBody(
     viewingPhoto?.let { url -> PhotoViewerDialog(url = url, onClose = { viewingPhoto = null }) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onEdit) { Text("Edit") }
-        OutlinedButton(onClick = onDiscuss) { Text("Discussion") }
+        OutlinedButton(onClick = onOpenNotes) { Text("Notes") }
         OutlinedButton(onClick = onToggleDone) {
             Text(if (task.status == "done") "Reopen" else "Mark done")
         }
@@ -491,9 +484,9 @@ private fun TaskDetailBody(
 }
 
 @Composable
-private fun TaskDiscussionScreen(
+private fun TaskNotesScreen(
     taskTitle: String,
-    messages: List<MessageRow>,
+    notes: List<MessageRow>,
     onSend: (String) -> Unit,
     onDelete: (String) -> Unit,
     onBack: () -> Unit,
@@ -515,7 +508,7 @@ private fun TaskDiscussionScreen(
                 )
             }
         }
-        DiscussionTab(messages = messages, onSend = onSend, onDelete = onDelete)
+        NotesTab(notes = notes, onSend = onSend, onDelete = onDelete)
     }
 }
 
@@ -1044,23 +1037,23 @@ private fun km(m: Double): String =
     if (m < 950) "${m.roundToInt()} m" else "${(m / 100).roundToInt() / 10.0} km"
 
 @Composable
-private fun DiscussionTab(
-    messages: List<MessageRow>,
+private fun NotesTab(
+    notes: List<MessageRow>,
     onSend: (String) -> Unit,
     onDelete: (String) -> Unit = {},
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(notes.size) {
+        if (notes.isNotEmpty()) listState.animateScrollToItem(notes.lastIndex)
     }
 
-    Column(Modifier.fillMaxSize()) {
-        if (messages.isEmpty()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        if (notes.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    "No messages yet. Start the conversation.",
+                    "No notes yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1072,7 +1065,7 @@ private fun DiscussionTab(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(messages, key = { it.id }) { m -> MessageBubble(m, onDelete = { onDelete(m.id) }) }
+                items(notes, key = { it.id }) { m -> MessageBubble(m, onDelete = { onDelete(m.id) }) }
             }
         }
 
@@ -1086,7 +1079,7 @@ private fun DiscussionTab(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Message") },
+                    placeholder = { Text("Note") },
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions =
@@ -1137,7 +1130,7 @@ private fun MessageBubble(m: MessageRow, onDelete: () -> Unit) {
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
-            title = { Text("Delete comment?") },
+            title = { Text("Delete note?") },
             confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
         )

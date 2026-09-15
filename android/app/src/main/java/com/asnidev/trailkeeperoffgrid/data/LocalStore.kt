@@ -205,6 +205,16 @@ object LocalStore {
 
     fun taskPhotoDir(taskId: String): File = File(photosRoot(), taskId).apply { mkdirs() }
 
+    /** A `photosJson.url` value is just a plain string round-tripped through
+     * backup import (see [Backup.importWorkspace]) — a tampered backup could
+     * set it to any path. Reject anything that doesn't canonically resolve
+     * inside our own photos dir before reading or deleting it. */
+    fun isOwnedPhotoPath(path: String): Boolean =
+        runCatching {
+            val root = photosRoot().canonicalPath
+            File(path).canonicalPath.startsWith(root + File.separator)
+        }.getOrDefault(false)
+
     /** Move an already-compressed JPEG into the task's photo folder and
      * record it in `photos_json`. */
     suspend fun addTaskPhoto(taskId: String, jpeg: File, caption: String = ""): Unit =
@@ -232,7 +242,7 @@ object LocalStore {
             arr.forEach { el ->
                 val o = el.asJsonObject
                 if (o.get("id")?.asString == photoId) {
-                    o.get("url")?.asString?.let { runCatching { File(it).delete() } }
+                    o.get("url")?.asString?.let { if (isOwnedPhotoPath(it)) runCatching { File(it).delete() } }
                 } else {
                     kept.add(o)
                 }
@@ -261,6 +271,7 @@ object LocalStore {
                 if (arr.size() == 0) continue
                 arr.forEach { el ->
                     el.asJsonObject.get("url")?.asString?.let { path ->
+                        if (!isOwnedPhotoPath(path)) return@let
                         val f = File(path)
                         if (f.exists()) { bytes += f.length(); if (f.delete()) files++ }
                     }
@@ -488,7 +499,7 @@ object LocalStore {
             arr.forEach { el ->
                 val o = el.asJsonObject
                 if (o.get("id")?.asString == photoId) {
-                    o.get("url")?.asString?.let { runCatching { File(it).delete() } }
+                    o.get("url")?.asString?.let { if (isOwnedPhotoPath(it)) runCatching { File(it).delete() } }
                 } else {
                     kept.add(o)
                 }
@@ -514,6 +525,7 @@ object LocalStore {
                 if (arr.size() == 0) continue
                 arr.forEach { el ->
                     el.asJsonObject.get("url")?.asString?.let { path ->
+                        if (!isOwnedPhotoPath(path)) return@let
                         val f = File(path)
                         if (f.exists()) { bytes += f.length(); if (f.delete()) files++ }
                     }

@@ -50,6 +50,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.asnidev.trailkeeperoffgrid.data.ImageCompress
+import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.google.gson.Gson
 import java.io.File
@@ -64,8 +65,13 @@ data class TaskPhotoRef(val id: String = "", val caption: String = "", val url: 
 private val gson = Gson()
 private val PHOTO_LIST = object : TypeToken<List<TaskPhotoRef>>() {}.type
 
+/** Parses `photosJson` and drops any entry whose `url` doesn't resolve inside
+ * our own photos dir — a restored backup is untrusted input (see
+ * [LocalStore.isOwnedPhotoPath]), and both the strip and the full-screen
+ * viewer read `url` straight off the filesystem. */
 fun parseTaskPhotos(json: String): List<TaskPhotoRef> =
     runCatching { gson.fromJson<List<TaskPhotoRef>>(json, PHOTO_LIST) }.getOrDefault(emptyList())
+        .filter { LocalStore.isOwnedPhotoPath(it.url) }
 
 /** A photo strip for anything that carries a `photosJson` column of
  * `[{id, caption, url}]` — tasks and trail-condition reports share the

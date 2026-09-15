@@ -30,8 +30,8 @@ android {
         applicationId = "com.trailkeeperoffgrid.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.3.4"
+        versionCode = 13
+        versionName = "0.3.5"
         // No API base URLs: Trailkeeper Offgrid has no backend. The only
         // network use is the optional map-region download and update check
         // (see docs/BLUEPRINT.md sec 5 / 7.6), which use absolute URLs.

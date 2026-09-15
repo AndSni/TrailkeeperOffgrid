@@ -66,14 +66,6 @@ class ProjectDetailViewModel(private val projectId: String) : ViewModel() {
         }
     }
 
-    /** The project's own notebook thread. */
-    val discussion: StateFlow<List<MessageRow>> =
-        combine(
-            db.messageDao().observeThread(projectId, null),
-            db.projectMemberDao().observeForProject(projectId),
-        ) { messages, members -> toRows(messages, members) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     /** taskId -> number of notes on that task's thread. */
     val taskCommentCounts: StateFlow<Map<String, Int>> =
         db.messageDao()
