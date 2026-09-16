@@ -1,8 +1,10 @@
 package com.asnidev.trailkeeperoffgrid.ui.projects
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -88,21 +90,40 @@ fun TaskPhotoStrip(
     val photos = remember(photosJson) { parseTaskPhotos(photosJson) }
     var working by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskPhotoRef?>(null) }
+    var showAddChooser by remember { mutableStateOf(false) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun uploadFrom(uri: Uri) {
+        working = true
+        scope.launch {
+            val file =
+                withContext(Dispatchers.IO) {
+                    runCatching { ImageCompress.compressForUpload(context, uri) }.getOrNull()
+                }
+            working = false
+            if (file != null) onUpload(file)
+        }
+    }
 
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                working = true
-                scope.launch {
-                    val file =
-                        withContext(Dispatchers.IO) {
-                            runCatching { ImageCompress.compressForUpload(context, uri) }.getOrNull()
-                        }
-                    working = false
-                    if (file != null) onUpload(file)
-                }
-            }
+            if (uri != null) uploadFrom(uri)
         }
+
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri
+            pendingCameraUri = null
+            if (success && uri != null) uploadFrom(uri)
+        }
+
+    fun launchCamera() {
+        val dir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+        val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        pendingCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
 
     Text("Photos (${photos.size})", style = MaterialTheme.typography.labelLarge)
     Text(
@@ -113,11 +134,7 @@ fun TaskPhotoStrip(
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             OutlinedButton(
-                onClick = {
-                    picker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
+                onClick = { showAddChooser = true },
                 modifier = Modifier.size(96.dp),
                 enabled = !working,
             ) {
@@ -154,6 +171,33 @@ fun TaskPhotoStrip(
                         },
             )
         }
+    }
+
+    if (showAddChooser) {
+        AlertDialog(
+            onDismissRequest = { showAddChooser = false },
+            title = { Text("Add photo") },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            showAddChooser = false
+                            launchCamera()
+                        }
+                    ) { Text("Take photo") }
+                    TextButton(
+                        onClick = {
+                            showAddChooser = false
+                            picker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                    ) { Text("Choose from gallery") }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showAddChooser = false }) { Text("Cancel") } },
+        )
     }
 
     pendingDelete?.let { photo ->

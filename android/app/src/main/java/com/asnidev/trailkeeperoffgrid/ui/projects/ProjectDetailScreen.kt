@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +25,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -45,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -65,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,6 +94,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.asnidev.trailkeeperoffgrid.data.Backup
+import com.asnidev.trailkeeperoffgrid.data.Gpx
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
@@ -94,6 +103,7 @@ import com.asnidev.trailkeeperoffgrid.location.freshLocation
 import com.google.gson.JsonParser
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val PRIORITIES = listOf("low", "medium", "high", "urgent")
 
@@ -327,6 +337,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                             hasLocation = hasLocation,
                             onSaveWalkedTrail = { name -> vm.saveWalkedTrail(name, s.project?.activity ?: "mtb") },
                             onOpen = { tr -> selected = "trail" to tr.id; focusOnMap(tr.geometryJson) },
+                            onDelete = { tr -> vm.deleteTrail(tr.id) },
                         )
                     tab == 4 -> SegmentWorkTab(workVm, s.trails, hasLocation)
                     else -> StructuresTab(structuresVm, hasLocation)
@@ -359,9 +370,15 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
         if (task == null && trail == null && structure == null && track == null && report == null) {
             selected = null
         } else {
-            ModalBottomSheet(onDismissRequest = { selected = null }) {
+            ModalBottomSheet(
+                onDismissRequest = { selected = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 4.dp, bottom = 28.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     when {
@@ -720,47 +737,79 @@ private fun TaskList(
     ) {
         items(tasks, key = { it.id }) { t ->
             val photos = jsonArraySize(t.photosJson)
-            val assignees = jsonArraySize(t.assigneeIdsJson)
             val comments = commentCounts[t.id] ?: 0
             val unread = t.id in unreadTasks
             val commentTint =
                 if (unread) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant
+            val done = t.status == "done"
+            val statusColor =
+                if (done) MaterialTheme.colorScheme.onSurfaceVariant else priorityColor(t.priority)
             Card(onClick = { onOpen(t) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PriorityTag(t.priority)
-                        Text(
-                            t.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
-                        )
-                        if (comments > 0) {
-                            Spacer(Modifier.weight(1f))
-                            Icon(
-                                Icons.AutoMirrored.Filled.Comment,
-                                contentDescription = if (unread) "Unread comments" else "Comments",
-                                modifier = Modifier.size(16.dp),
-                                tint = commentTint,
-                            )
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Row 1: urgency
+                    PriorityTag(t.priority)
+                    // Row 2: title
+                    Text(
+                        t.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // Row 3: status/photo/comment (left) · mark done (right)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
                             Text(
-                                " $comments",
+                                buildString {
+                                    append(t.status.replace('_', ' '))
+                                    if (t.taskType.isNotBlank()) append(" · ${t.taskType}")
+                                },
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (unread) FontWeight.Bold else null,
-                                color = commentTint,
+                                fontWeight = if (done) null else FontWeight.Bold,
+                                color = statusColor,
                             )
+                            if (photos > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Photo,
+                                        contentDescription = "Photos",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        " $photos",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            if (comments > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Comment,
+                                        contentDescription = if (unread) "Unread comments" else "Comments",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = commentTint,
+                                    )
+                                    Text(
+                                        " $comments",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (unread) FontWeight.Bold else null,
+                                        color = commentTint,
+                                    )
+                                }
+                            }
+                        }
+                        if (done) {
+                            TextButton(onClick = { onSetStatus(t.id, "open") }) { Text("Reopen") }
+                        } else {
+                            TextButton(onClick = { onSetStatus(t.id, "done") }) { Text("Mark done") }
                         }
                     }
-                    Text(
-                        buildString {
-                            append(t.status.replace('_', ' '))
-                            if (t.taskType.isNotBlank()) append(" · ${t.taskType}")
-                            if (photos > 0) append(" · $photos photo${plural(photos)}")
-                            if (assignees > 0) append(" · $assignees assignee${plural(assignees)}")
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     if (t.description.isNotBlank()) {
                         Text(
                             t.description,
@@ -768,13 +817,6 @@ private fun TaskList(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        if (t.status == "done") {
-                            TextButton(onClick = { onSetStatus(t.id, "open") }) { Text("Reopen") }
-                        } else {
-                            TextButton(onClick = { onSetStatus(t.id, "done") }) { Text("Mark done") }
-                        }
                     }
                 }
             }
@@ -790,15 +832,17 @@ private fun TrailList(
     hasLocation: Boolean,
     onSaveWalkedTrail: (String) -> Unit,
     onOpen: (TrailEntity) -> Unit,
+    onDelete: (TrailEntity) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var pendingDelete by remember { mutableStateOf<TrailEntity?>(null) }
     val gpxImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val r = Backup.importGpx(context, uri, projectId)
+                val r = Backup.importGpx(context, uri, projectId, forceKind = Gpx.Kind.ROUTE)
                 Toast.makeText(context, r.detail, Toast.LENGTH_LONG).show()
             }
         }
@@ -818,7 +862,7 @@ private fun TrailList(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Import GPX into this project") }
+            ) { Text("Import GPX (trails only)") }
         }
         if (trails.isEmpty()) {
             item {
@@ -830,7 +874,28 @@ private fun TrailList(
             }
         }
         items(trails, key = { it.id }) { tr ->
-            Card(onClick = { onOpen(tr) }, modifier = Modifier.fillMaxWidth()) {
+            // Hold for 1s -> delete confirm; a short tap opens it. Same shape
+            // as the project-card gesture in ProjectListScreen.
+            Card(
+                modifier = Modifier.fillMaxWidth().pointerInput(tr.id) {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        var released = false
+                        val heldFull =
+                            withTimeoutOrNull(1_000L) {
+                                released = waitForUpOrCancellation() != null
+                                true
+                            } == null
+                        when {
+                            heldFull -> {
+                                pendingDelete = tr
+                                waitForUpOrCancellation()
+                            }
+                            released -> onOpen(tr)
+                        }
+                    }
+                },
+            ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(tr.name, style = MaterialTheme.typography.titleMedium)
                     Text(
@@ -841,6 +906,18 @@ private fun TrailList(
                 }
             }
         }
+    }
+
+    pendingDelete?.let { tr ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete this trail?") },
+            text = { Text("${tr.name} — this can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(tr); pendingDelete = null }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -999,14 +1076,17 @@ private fun ScopeSegment(label: String, selected: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
+private fun priorityColor(priority: String): Color =
+    when (priority) {
+        "urgent" -> MaterialTheme.colorScheme.error
+        "high" -> Color(0xFFD6A64B)
+        "low" -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+@Composable
 private fun PriorityTag(priority: String) {
-    val color =
-        when (priority) {
-            "urgent" -> MaterialTheme.colorScheme.error
-            "high" -> Color(0xFFD6A64B)
-            "low" -> MaterialTheme.colorScheme.onSurfaceVariant
-            else -> MaterialTheme.colorScheme.primary
-        }
+    val color = priorityColor(priority)
     Surface(color = color, shape = RoundedCornerShape(4.dp)) {
         Text(
             priority.uppercase(),
@@ -1030,8 +1110,6 @@ private fun EmptyHint(text: String) {
 
 private fun jsonArraySize(json: String): Int =
     runCatching { JsonParser.parseString(json).asJsonArray.size() }.getOrDefault(0)
-
-private fun plural(n: Int) = if (n == 1) "" else "s"
 
 private fun km(m: Double): String =
     if (m < 950) "${m.roundToInt()} m" else "${(m / 100).roundToInt() / 10.0} km"

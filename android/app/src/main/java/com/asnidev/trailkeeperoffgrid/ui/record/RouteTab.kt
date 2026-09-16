@@ -2,6 +2,9 @@ package com.asnidev.trailkeeperoffgrid.ui.record
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -46,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.rotate
 import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Geo
+import com.asnidev.trailkeeperoffgrid.data.Gpx
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.TrailReports
@@ -60,6 +65,7 @@ import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
 import com.asnidev.trailkeeperoffgrid.record.TrackRecordingService
 import com.asnidev.trailkeeperoffgrid.location.freshLocation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val PRIORITIES = listOf("low", "medium", "high", "urgent")
 
@@ -82,6 +88,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
     var showMark by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
     var pendingDeleteReport by remember { mutableStateOf<TrailReportEntity?>(null) }
+    var pendingDeleteTrack by remember { mutableStateOf<TrackEntity?>(null) }
     var name by remember { mutableStateOf("") }
 
     val gpxImportLauncher = rememberLauncherForActivityResult(
@@ -89,7 +96,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val r = Backup.importGpx(context, uri, projectId)
+                val r = Backup.importGpx(context, uri, projectId, forceKind = Gpx.Kind.TRACK)
                 message = r.detail
             }
         }
@@ -206,7 +213,7 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import GPX into this project") }
+                ) { Text("Import GPX (routes only)") }
             }
 
             item { HorizontalDivider() }
@@ -238,7 +245,9 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                 }
             } else {
                 item { Text("Routes (${tracks.size})", style = MaterialTheme.typography.titleSmall) }
-                items(tracks, key = { it.id }) { TrackCard(it) }
+                items(tracks, key = { it.id }) { t ->
+                    TrackCard(t, onLongPressDelete = { pendingDeleteTrack = t })
+                }
             }
         }
     }
@@ -274,6 +283,21 @@ fun RouteTab(projectId: String, activity: String, hasLocation: Boolean) {
                 }) { Text("Delete") }
             },
             dismissButton = { TextButton(onClick = { pendingDeleteReport = null }) { Text("Cancel") } },
+        )
+    }
+
+    pendingDeleteTrack?.let { t ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTrack = null },
+            title = { Text("Delete this route?") },
+            text = { Text("${t.name} — this can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { LocalStore.deleteTrack(t.id) }
+                    pendingDeleteTrack = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeleteTrack = null }) { Text("Cancel") } },
         )
     }
 
@@ -326,13 +350,28 @@ private fun TrackBackRow(points: List<RecPoint>) {
 }
 
 @Composable
-private fun TrackCard(t: TrackEntity) {
+private fun TrackCard(t: TrackEntity, onLongPressDelete: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var backInfo by remember(t.id) { mutableStateOf<String?>(null) }
     var checking by remember(t.id) { mutableStateOf(false) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier.fillMaxWidth().pointerInput(t.id) {
+            awaitEachGesture {
+                awaitFirstDown()
+                val heldFull =
+                    withTimeoutOrNull(1_000L) {
+                        waitForUpOrCancellation()
+                        true
+                    } == null
+                if (heldFull) {
+                    onLongPressDelete()
+                    waitForUpOrCancellation()
+                }
+            }
+        },
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SourceTag(t.source)

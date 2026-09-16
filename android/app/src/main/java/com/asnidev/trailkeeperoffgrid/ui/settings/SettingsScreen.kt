@@ -2,7 +2,11 @@ package com.asnidev.trailkeeperoffgrid.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -10,14 +14,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -40,11 +48,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asnidev.trailkeeperoffgrid.BuildConfig
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
+import com.asnidev.trailkeeperoffgrid.data.ThemePrefs
+import com.asnidev.trailkeeperoffgrid.ui.theme.ACCENT_SWATCHES
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +106,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { ProfileCard(vm) }
+            item { AppearanceCard(vm) }
             item { OfflineMapsCard(vm, onBrowseAll = { browsingCountries = true }) }
             item { StructureTypesCard(onManage = { editingTypes = true }) }
             item { RemindersCard(vm) }
@@ -135,6 +148,54 @@ private fun ProfileCard(vm: SettingsViewModel) {
         )
         val dirty = name.trim() != stored.trim()
         Button(onClick = { vm.saveDisplayName(name) }, enabled = dirty) { Text("Save") }
+    }
+}
+
+@Composable
+private fun AppearanceCard(vm: SettingsViewModel) {
+    val mode by vm.themeMode.collectAsState()
+    val accent by vm.themeAccent.collectAsState()
+
+    SectionCard("Appearance") {
+        Text("Theme", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemePrefs.Mode.entries.forEach { m ->
+                FilterChip(
+                    selected = mode == m,
+                    onClick = { vm.setThemeMode(m) },
+                    label = { Text(m.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                )
+            }
+        }
+        Text("Accent color", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ACCENT_SWATCHES.forEach { a ->
+                val selected = a.key == accent
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(a.swatch)
+                        .border(
+                            width = if (selected) 3.dp else 1.dp,
+                            color = if (selected) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.outline,
+                            shape = CircleShape,
+                        )
+                        .clickable { vm.setThemeAccent(a.key) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = a.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -322,7 +383,10 @@ private fun BackupCard(vm: SettingsViewModel) {
         }
 
         Text(
-            "GPX — hand routes and trails to another app or phone.",
+            "GPX — hand routes and trails to another app or phone. This import " +
+                "brings in both routes and trails from the file; to import only " +
+                "one kind, use the Import GPX button on that project's Route or " +
+                "Trails tab instead.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -334,7 +398,7 @@ private fun BackupCard(vm: SettingsViewModel) {
             OutlinedButton(
                 onClick = { gpxImportLauncher.launch(arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")) },
                 enabled = !busy && projects.isNotEmpty(),
-            ) { Text("Import GPX") }
+            ) { Text("Import GPX (routes & trails)") }
         }
         if (projects.isEmpty()) {
             Text(

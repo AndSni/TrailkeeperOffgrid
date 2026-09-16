@@ -139,6 +139,10 @@ class ProjectDetailViewModel(private val projectId: String) : ViewModel() {
         viewModelScope.launch { runCatching { LocalStore.deleteTrailReport(reportId) } }
     }
 
+    fun deleteTrail(trailId: String) {
+        viewModelScope.launch { runCatching { LocalStore.deleteTrail(trailId) } }
+    }
+
     fun uploadReportPhoto(reportId: String, jpeg: java.io.File) {
         viewModelScope.launch {
             runCatching { LocalStore.addReportPhoto(reportId, jpeg) }

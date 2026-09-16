@@ -9,6 +9,7 @@ import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 import com.asnidev.trailkeeperoffgrid.data.Reminders
+import com.asnidev.trailkeeperoffgrid.data.ThemePrefs
 import com.asnidev.trailkeeperoffgrid.data.local.ProjectEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureTypeEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailkeeperDb
@@ -60,6 +61,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         Reminders.enabledFlow(ctx)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
+    val themeMode: StateFlow<ThemePrefs.Mode> =
+        ThemePrefs.modeFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemePrefs.mode())
+
+    val themeAccent: StateFlow<String> =
+        ThemePrefs.accentFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemePrefs.accent())
+
     val lastBackup: StateFlow<String?> =
         Backup.lastBackupFlow(ctx)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -89,6 +98,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveDisplayName(name: String) {
         viewModelScope.launch { Identity.setDisplayName(name) }
+    }
+
+    fun setThemeMode(mode: ThemePrefs.Mode) {
+        viewModelScope.launch { ThemePrefs.setMode(mode) }
+    }
+
+    fun setThemeAccent(key: String) {
+        viewModelScope.launch { ThemePrefs.setAccent(key) }
     }
 
     fun refreshRegions() {

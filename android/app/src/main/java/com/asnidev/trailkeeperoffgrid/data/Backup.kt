@@ -241,7 +241,21 @@ object Backup {
             }
         }
 
-    suspend fun importGpx(context: Context, src: Uri, projectId: String): Result =
+    /**
+     * [forceKind], when set, imports every segment in the file as that kind
+     * regardless of whether it was written as `<trk>` or `<rte>` — real-world
+     * GPX exports (Strava, Garmin, AllTrails, this app's own track recorder)
+     * are almost always `<trk>` no matter what the line conceptually is, so
+     * filtering by tag (the previous behaviour) made "import as trail" fail
+     * on nearly every real file. Left `null` (the generic Settings import),
+     * each segment keeps using its own tag as before.
+     */
+    suspend fun importGpx(
+        context: Context,
+        src: Uri,
+        projectId: String,
+        forceKind: Gpx.Kind? = null,
+    ): Result =
         withContext(Dispatchers.IO) {
             try {
                 val xml = context.contentResolver.openInputStream(src)?.use {
@@ -254,7 +268,7 @@ object Backup {
                 var trails = 0
                 for (s in segments) {
                     if (s.points.size < 2) continue
-                    when (s.kind) {
+                    when (forceKind ?: s.kind) {
                         Gpx.Kind.TRACK -> {
                             LocalStore.saveTrack(
                                 TrackCreateRequest(
