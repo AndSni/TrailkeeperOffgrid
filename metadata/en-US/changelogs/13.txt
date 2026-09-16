@@ -1,0 +1,1 @@
+Hardened workspace restore against a path-traversal bug in the backup .zip format. Removed the old project-wide "Discussion" tab; the per-task thread is now labelled "Notes" and stays. Fixed the keyboard covering/shoving the Notes input on some devices. Licensed under GPL-3.0.
