@@ -220,6 +220,7 @@ data class TrackCreateRequest(
 data class StructureCreateRequest(
     val name: String,
     val structureType: String,
+    val projectId: String? = null,
     val status: String = "good",
     val lat: Double? = null,
     val lon: Double? = null,

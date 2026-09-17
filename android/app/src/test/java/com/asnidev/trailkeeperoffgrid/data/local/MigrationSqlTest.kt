@@ -40,6 +40,13 @@ class MigrationSqlTest {
         return conn
     }
 
+    /** v2 schema + [TrailkeeperDb.MIGRATION_2_3]'s DDL/seed already applied. */
+    private fun freshV3Connection(): Connection {
+        val conn = freshV2Connection()
+        applyMigration2To3(conn)
+        return conn
+    }
+
     @Test
     fun v1SchemaHasEveryTableTheAppShipped() {
         freshV1Connection().use { conn ->
@@ -176,6 +183,55 @@ class MigrationSqlTest {
                 val rs = st.executeQuery("SELECT name FROM structures WHERE id = 's1'")
                 assertTrue("the pre-migration structure row must survive", rs.next())
                 assertEquals("Culvert 1", rs.getString(1))
+            }
+        }
+    }
+
+    private fun applyMigration3To4(conn: Connection) {
+        conn.createStatement().use { it.execute(TrailkeeperDb.ADD_TRAILS_PROJECT_ID_V4) }
+        conn.createStatement().use { it.execute(TrailkeeperDb.ADD_STRUCTURES_PROJECT_ID_V4) }
+    }
+
+    @Test
+    fun migrate3To4_addsProjectIdToTrailsAndStructures() {
+        freshV3Connection().use { conn ->
+            applyMigration3To4(conn)
+
+            assertTrue(columnInfo(conn, "trails").contains(Col("projectId", "TEXT", notNull = false, pk = 0)))
+            assertTrue(columnInfo(conn, "structures").contains(Col("projectId", "TEXT", notNull = false, pk = 0)))
+        }
+    }
+
+    @Test
+    fun migrate3To4_preservesExistingRows_withNullProjectId() {
+        freshV3Connection().use { conn ->
+            conn.createStatement().use { st ->
+                st.execute(
+                    "INSERT INTO trails (id, organisationId, name, activity, difficulty, status, " +
+                        "source, lengthM, geometryJson) VALUES ('tr1', 'local', 'Blue Trail', 'mtb', " +
+                        "'', 'open', 'walked', 100.0, NULL)"
+                )
+                st.execute(
+                    "INSERT INTO structures (id, organisationId, name, structureType, status, " +
+                        "geometryJson, nearestTrailId, material, color, installedOn, " +
+                        "inspectionIntervalDays, notes) VALUES ('s1', 'local', 'Culvert 1', " +
+                        "'culvert', 'good', NULL, NULL, '', '', NULL, NULL, '')"
+                )
+            }
+
+            applyMigration3To4(conn)
+
+            conn.createStatement().use { st ->
+                val rs = st.executeQuery("SELECT name, projectId FROM trails WHERE id = 'tr1'")
+                assertTrue("the pre-migration trail row must survive", rs.next())
+                assertEquals("Blue Trail", rs.getString(1))
+                assertEquals(null, rs.getString(2))
+            }
+            conn.createStatement().use { st ->
+                val rs = st.executeQuery("SELECT name, projectId FROM structures WHERE id = 's1'")
+                assertTrue("the pre-migration structure row must survive", rs.next())
+                assertEquals("Culvert 1", rs.getString(1))
+                assertEquals(null, rs.getString(2))
             }
         }
     }

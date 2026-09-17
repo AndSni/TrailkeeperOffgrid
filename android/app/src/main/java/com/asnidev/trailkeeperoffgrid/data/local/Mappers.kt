@@ -41,6 +41,7 @@ fun TrailDto.toEntity() =
     TrailEntity(
         id = id,
         organisationId = organisationId,
+        projectId = null,
         name = name,
         activity = activity,
         difficulty = difficulty,
@@ -140,6 +141,7 @@ fun StructureDto.toEntity() =
     StructureEntity(
         id = id,
         organisationId = organisationId,
+        projectId = null,
         name = name,
         structureType = structureType,
         status = status,

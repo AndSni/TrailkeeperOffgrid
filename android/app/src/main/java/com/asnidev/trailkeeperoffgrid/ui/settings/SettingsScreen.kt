@@ -1,5 +1,7 @@
 package com.asnidev.trailkeeperoffgrid.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -50,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -108,6 +111,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
             item { ProfileCard(vm) }
             item { AppearanceCard(vm) }
             item { OfflineMapsCard(vm, onBrowseAll = { browsingCountries = true }) }
+            item { MapScopeCard(vm) }
             item { StructureTypesCard(onManage = { editingTypes = true }) }
             item { RemindersCard(vm) }
             item { BackupCard(vm) }
@@ -201,9 +205,7 @@ private fun AppearanceCard(vm: SettingsViewModel) {
 
 @Composable
 private fun OfflineMapsCard(vm: SettingsViewModel, onBrowseAll: () -> Unit) {
-    val quick by vm.quickPresets.collectAsState()
     val downloaded by vm.downloadedRegions.collectAsState()
-    val downloads by vm.downloads.collectAsState()
 
     SectionCard("Offline maps") {
         Text(
@@ -214,21 +216,14 @@ private fun OfflineMapsCard(vm: SettingsViewModel, onBrowseAll: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        quick.forEach { p ->
-            RegionRow(
-                preset = p,
-                downloading = downloads[p.id],
-                alreadySaved = downloaded.any { it.name == p.name && it.complete },
-                onDownload = { vm.downloadPreset(p) },
+        if (downloaded.isEmpty()) {
+            Text(
+                "No maps downloaded yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-
-        OutlinedButton(onClick = onBrowseAll, modifier = Modifier.fillMaxWidth()) {
-            Text("Browse all countries →")
-        }
-
-        if (downloaded.isNotEmpty()) {
-            Text("Downloaded", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+        } else {
+            Text("Downloaded", style = MaterialTheme.typography.labelLarge)
             downloaded.forEach { r ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -242,6 +237,10 @@ private fun OfflineMapsCard(vm: SettingsViewModel, onBrowseAll: () -> Unit) {
                     TextButton(onClick = { vm.deleteRegion(r.id, r.name) }) { Text("Delete") }
                 }
             }
+        }
+
+        OutlinedButton(onClick = onBrowseAll, modifier = Modifier.fillMaxWidth()) {
+            Text("Browse all countries →")
         }
     }
 }
@@ -281,6 +280,61 @@ fun RegionRow(
         downloading?.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
         }
+    }
+}
+
+@Composable
+private fun MapScopeCard(vm: SettingsViewModel) {
+    val storedRadius by vm.mapScopeRadiusM.collectAsState()
+    var radiusText by rememberSaveable(storedRadius) { mutableStateOf(storedRadius.toInt().toString()) }
+    val parsedRadius = radiusText.toDoubleOrNull()
+    val radiusValid =
+        parsedRadius != null && parsedRadius >= com.asnidev.trailkeeperoffgrid.data.MapScopePrefs.MIN_RADIUS_M &&
+            parsedRadius <= com.asnidev.trailkeeperoffgrid.data.MapScopePrefs.MAX_RADIUS_M
+    val radiusDirty = radiusValid && parsedRadius != storedRadius
+
+    val storedMarker by vm.markerRadiusDp.collectAsState()
+    var markerText by rememberSaveable(storedMarker) { mutableStateOf(storedMarker.toInt().toString()) }
+    val parsedMarker = markerText.toDoubleOrNull()
+    val markerValid =
+        parsedMarker != null && parsedMarker >= com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs.MIN_MARKER_RADIUS_DP &&
+            parsedMarker <= com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs.MAX_MARKER_RADIUS_DP
+    val markerDirty = markerValid && parsedMarker != storedMarker
+
+    SectionCard("Map") {
+        Text(
+            "Marker size — how big task/structure/report dots are on the map. " +
+                "Bigger is easier to tap.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = markerText,
+            onValueChange = { markerText = it.filter { c -> c.isDigit() } },
+            label = { Text("Marker size (dp)") },
+            singleLine = true,
+            isError = markerText.isNotBlank() && !markerValid,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(onClick = { parsedMarker?.let(vm::setMarkerRadiusDp) }, enabled = markerDirty) { Text("Save") }
+
+        Text(
+            "This-project scope — on a project's map, \"This project\" dims " +
+                "trails/structures that weren't created here and aren't within " +
+                "this distance of one of this project's own trails or recorded " +
+                "routes. Tune it to how dense the trail network is where you work.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = radiusText,
+            onValueChange = { radiusText = it.filter { c -> c.isDigit() } },
+            label = { Text("Radius (metres)") },
+            singleLine = true,
+            isError = radiusText.isNotBlank() && !radiusValid,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(onClick = { parsedRadius?.let(vm::setMapScopeRadiusM) }, enabled = radiusDirty) { Text("Save") }
     }
 }
 
@@ -508,6 +562,7 @@ private fun RemindersCard(vm: SettingsViewModel) {
 
 @Composable
 private fun AboutCard() {
+    val context = LocalContext.current
     SectionCard("About") {
         Text("Trailkeeper Offgrid ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         Text(
@@ -516,5 +571,30 @@ private fun AboutCard() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text(
+            "A note from the developer",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Text(
+            "Trailkeeper Offgrid exists to help volunteer trail crews, non-profit " +
+                "land trusts, and everyone else keeping trails open without a " +
+                "budget for expensive software. It's free, it's open source, and " +
+                "it always will be — no accounts, no subscriptions, no ads, and " +
+                "your data never leaves your phone.\n\n" +
+                "It's built and maintained by a single independent developer in " +
+                "their spare time, not a company. If it saves you time out on the " +
+                "trail and you'd like to help keep it going, a small donation " +
+                "goes a long way — but there's never any obligation. Thank you " +
+                "for using it, and for the work you do maintaining trails.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/andrissni"))
+                context.startActivity(intent)
+            },
+        ) { Text("Support on Ko-fi") }
     }
 }

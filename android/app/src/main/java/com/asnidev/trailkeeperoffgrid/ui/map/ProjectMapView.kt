@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -75,7 +76,18 @@ private val LATVIA = LatLng(56.95, 24.6)
 typealias MapFocus = Triple<Double, Double, Long>
 
 /** Holds the map + style handles once they're ready, plus a one-shot flag so
- * the camera only auto-fits the first time data arrives. */
+ * the camera only auto-fits the first time data arrives.
+ *
+ * Also holds the latest copy of every [pushData] argument, refreshed on
+ * every recomposition (see the assignments right after `remember { MapHolder() }`
+ * in [ProjectMap]) - the map's own style can take a moment to finish loading
+ * asynchronously, and that one-time load-completion callback must read
+ * whatever is CURRENT at the moment it actually fires, not whatever was
+ * true back when the `remember { MapView(...) }` block first ran. Without
+ * this, a fast edit (e.g. moving a task) that lands *while* the style is
+ * still loading gets silently overwritten by that stale one-time push, and
+ * nothing else ever re-triggers it - only leaving and re-entering the tab
+ * (a fresh mount) picks the edit up. */
 private class MapHolder {
     var map: MapLibreMap? = null
     var style: Style? = null
@@ -85,6 +97,17 @@ private class MapHolder {
      * forceLocationUpdate() call before that throws, and a GPS fix can
      * easily arrive before the (async) style/location setup finishes. */
     var locationReady = false
+
+    var trails: List<TrailEntity> = emptyList()
+    var tasks: List<TaskEntity> = emptyList()
+    var structures: List<StructureEntity> = emptyList()
+    var tracks: List<TrackEntity> = emptyList()
+    var reports: List<TrailReportEntity> = emptyList()
+    var projectTrailIds: Set<String> = emptySet()
+    var projectStructureIds: Set<String> = emptySet()
+    var projectBounds: LatLngBounds? = null
+    var showAllAssets: Boolean = true
+    var markerRadiusDp: Float = com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs.DEFAULT_MARKER_RADIUS_DP.toFloat()
 }
 
 @Composable
@@ -108,6 +131,19 @@ fun ProjectMap(
     val holder = remember { MapHolder() }
     val onTapHolder = remember { arrayOfNulls<(String, String) -> Unit>(1) }
     onTapHolder[0] = onFeatureTap
+    val markerRadiusDp by
+        com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs.markerRadiusDpFlow()
+            .collectAsState(initial = com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs.markerRadiusDp())
+    holder.markerRadiusDp = markerRadiusDp.toFloat()
+    holder.trails = trails
+    holder.tasks = tasks
+    holder.structures = structures
+    holder.tracks = tracks
+    holder.reports = reports
+    holder.projectTrailIds = projectTrailIds
+    holder.projectStructureIds = projectStructureIds
+    holder.projectBounds = projectBounds
+    holder.showAllAssets = showAllAssets
 
     // Set once the style has genuinely failed to load and never succeeded
     // before (no signal yet, and no offline region has ever been downloaded
@@ -243,10 +279,9 @@ fun ProjectMap(
                     )
                     enableLocation(context, map, style, hasLocationPermission) { trackingMode = it }
                     holder.locationReady = hasLocationPermission
-                    pushData(
-                        holder, trails, tasks, structures, tracks, reports,
-                        projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
-                    )
+                    // Read back off holder, not the trails/tasks/... params
+                    // closed over above - see MapHolder's doc comment.
+                    pushData(holder)
                 }
             }
         }
@@ -276,10 +311,7 @@ fun ProjectMap(
             factory = { mapView },
             modifier = Modifier.fillMaxSize(),
             update = {
-                pushData(
-                    holder, trails, tasks, structures, tracks, reports,
-                    projectTrailIds, projectStructureIds, projectBounds, showAllAssets,
-                )
+                pushData(holder)
                 if (focus != null && focus.third != holder.lastFocusNonce) {
                     holder.lastFocusNonce = focus.third
                     holder.map?.easeCamera(
@@ -411,25 +443,30 @@ private fun GpsSignalBars(accuracyM: Float?, modifier: Modifier = Modifier) {
     }
 }
 
-private fun pushData(
-    holder: MapHolder,
-    trails: List<TrailEntity>,
-    tasks: List<TaskEntity>,
-    structures: List<StructureEntity>,
-    tracks: List<TrackEntity>,
-    reports: List<TrailReportEntity>,
-    projectTrailIds: Set<String>,
-    projectStructureIds: Set<String>,
-    projectBounds: LatLngBounds?,
-    showAllAssets: Boolean,
-) {
+/** Reads everything off [holder] (kept fresh every recomposition - see its
+ * doc comment) rather than taking the data as parameters, so it's safe to
+ * call from the map's one-time async style-load callback without risking a
+ * stale snapshot from whenever that closure was first created. */
+private fun pushData(holder: MapHolder) {
     val style = holder.style ?: return
+    val trails = holder.trails
+    val tasks = holder.tasks
+    val structures = holder.structures
+    val tracks = holder.tracks
+    val reports = holder.reports
+    val showAllAssets = holder.showAllAssets
+    val r = holder.markerRadiusDp
+    style.getLayer("$TASK_SRC-dot")?.setProperties(PropertyFactory.circleRadius(r))
+    style.getLayer("$STRUCTURE_SRC-dot")?.setProperties(
+        PropertyFactory.circleRadius(dimSwitch(r * 2f / 3f, r))
+    )
+    style.getLayer("$REPORT_SRC-dot")?.setProperties(PropertyFactory.circleRadius(r * 5f / 6f))
     val dimTrails =
         if (showAllAssets) emptySet()
-        else trails.map { it.id }.toSet() - projectTrailIds
+        else trails.map { it.id }.toSet() - holder.projectTrailIds
     val dimStructures =
         if (showAllAssets) emptySet()
-        else structures.map { it.id }.toSet() - projectStructureIds
+        else structures.map { it.id }.toSet() - holder.projectStructureIds
 
     (style.getSource(TRAIL_SRC) as? GeoJsonSource)
         ?.setGeoJson(MapGeo.trailFeatures(trails, dimTrails))
@@ -440,7 +477,7 @@ private fun pushData(
     (style.getSource(REPORT_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.reportFeatures(reports))
 
     if (!holder.fittedCamera) {
-        val bounds = projectBounds ?: MapGeo.bounds(trails, tasks, structures, tracks)
+        val bounds = holder.projectBounds ?: MapGeo.bounds(trails, tasks, structures, tracks)
         if (bounds != null) {
             holder.map?.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72), 500)
             holder.fittedCamera = true

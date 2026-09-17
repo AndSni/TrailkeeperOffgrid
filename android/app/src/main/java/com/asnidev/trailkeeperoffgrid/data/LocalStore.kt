@@ -307,6 +307,7 @@ object LocalStore {
         activity: String,
         points: List<Pair<Double, Double>>,
         source: String = "walked",
+        projectId: String? = null,
     ): String {
         require(points.size >= 2) { "A trail needs at least two points" }
         val id = newId()
@@ -314,6 +315,7 @@ object LocalStore {
             TrailEntity(
                 id = id,
                 organisationId = Identity.ORG_ID,
+                projectId = projectId,
                 name = name.trim().ifBlank { "Trail" },
                 activity = activity.ifBlank { "mtb" },
                 difficulty = "",
@@ -328,6 +330,15 @@ object LocalStore {
 
     suspend fun deleteTrail(id: String) = db.trailDao().deleteById(id)
 
+    /** Manually attach/detach a trail to a project - the escape hatch for a
+     * trail that predates the projectId field, or one that was created
+     * elsewhere but genuinely belongs here too (map's "This project" scope
+     * rule A). [projectId] null detaches it back to unassigned. */
+    suspend fun setTrailProject(id: String, projectId: String?) {
+        val t = db.trailDao().getById(id) ?: return
+        db.trailDao().upsert(t.copy(projectId = projectId))
+    }
+
     // ---- structures (org-wide) -------------------------------------
 
     suspend fun createStructure(req: StructureCreateRequest): String {
@@ -341,6 +352,7 @@ object LocalStore {
             StructureEntity(
                 id = id,
                 organisationId = Identity.ORG_ID,
+                projectId = req.projectId,
                 name = req.name.trim().ifBlank { "Structure" },
                 structureType = req.structureType,
                 status = req.status,
@@ -354,6 +366,13 @@ object LocalStore {
             )
         )
         return id
+    }
+
+    /** Manually attach/detach a structure to a project - same escape hatch
+     * as [setTrailProject], for the same reason. */
+    suspend fun setStructureProject(id: String, projectId: String?) {
+        val s = db.structureDao().getById(id) ?: return
+        db.structureDao().upsert(s.copy(projectId = projectId))
     }
 
     suspend fun updateStructure(id: String, req: StructurePatchRequest) {

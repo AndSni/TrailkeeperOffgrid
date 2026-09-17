@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
+import com.asnidev.trailkeeperoffgrid.data.MapDisplayPrefs
+import com.asnidev.trailkeeperoffgrid.data.MapScopePrefs
 import com.asnidev.trailkeeperoffgrid.data.OfflineMaps
 import com.asnidev.trailkeeperoffgrid.data.Reminders
 import com.asnidev.trailkeeperoffgrid.data.ThemePrefs
@@ -69,6 +71,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         ThemePrefs.accentFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemePrefs.accent())
 
+    val mapScopeRadiusM: StateFlow<Double> =
+        MapScopePrefs.radiusMFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapScopePrefs.radiusM())
+
+    val markerRadiusDp: StateFlow<Double> =
+        MapDisplayPrefs.markerRadiusDpFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapDisplayPrefs.markerRadiusDp())
+
     val lastBackup: StateFlow<String?> =
         Backup.lastBackupFlow(ctx)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -106,6 +116,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setThemeAccent(key: String) {
         viewModelScope.launch { ThemePrefs.setAccent(key) }
+    }
+
+    fun setMapScopeRadiusM(meters: Double) {
+        viewModelScope.launch { MapScopePrefs.setRadiusM(meters) }
+    }
+
+    fun setMarkerRadiusDp(dp: Double) {
+        viewModelScope.launch { MapDisplayPrefs.setMarkerRadiusDp(dp) }
     }
 
     fun refreshRegions() {

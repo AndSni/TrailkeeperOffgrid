@@ -86,6 +86,7 @@ class StructuresViewModel(private val projectId: String) : ViewModel() {
                     StructureCreateRequest(
                         name = name.trim(),
                         structureType = type,
+                        projectId = projectId,
                         material = material.trim(),
                         notes = notes.trim(),
                         color = color,
@@ -119,6 +120,16 @@ class StructuresViewModel(private val projectId: String) : ViewModel() {
                 LocalStore.updateStructure(id, StructurePatchRequest(lat = lat, lon = lon))
             }
                 .onFailure { e -> _message.value = e.message ?: "Couldn't move the structure" }
+        }
+    }
+
+    /** Manually attach/detach a structure that predates the `projectId`
+     * field (or was created elsewhere) to/from this project - see
+     * [LocalStore.setStructureProject]. */
+    fun setStructureProject(id: String, inThisProject: Boolean) {
+        viewModelScope.launch {
+            runCatching { LocalStore.setStructureProject(id, if (inThisProject) projectId else null) }
+                .onFailure { e -> _message.value = e.message ?: "Couldn't update the structure" }
         }
     }
 

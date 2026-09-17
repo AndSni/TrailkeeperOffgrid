@@ -62,13 +62,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionEntity
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionFormEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import com.asnidev.trailkeeperoffgrid.ui.common.PointPickerScreen
 import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
+fun StructuresTab(
+    vm: StructuresViewModel,
+    hasLocation: Boolean,
+    trails: List<TrailEntity> = emptyList(),
+    tracks: List<TrackEntity> = emptyList(),
+) {
     val structures by vm.structures.collectAsState()
     val structureTypes by vm.structureTypes.collectAsState()
     val forms by vm.forms.collectAsState()
@@ -92,6 +99,8 @@ fun StructuresTab(vm: StructuresViewModel, hasLocation: Boolean) {
             title = "Place the structure",
             hasLocation = hasLocation,
             initial = addPoint,
+            trails = trails,
+            tracks = tracks,
             onDone = { lat, lon -> addPoint = lat to lon; addMode = "form" },
             onCancel = { addMode = "form" },
         )

@@ -28,7 +28,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
+import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.location.freshLocation
+import com.asnidev.trailkeeperoffgrid.ui.map.MapGeo
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -36,22 +39,31 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 
 private val STYLE_URL get() = com.asnidev.trailkeeperoffgrid.ui.map.MapStyle.URL
 private const val SRC = "pick-pt"
+private const val TRAIL_SRC = "pick-trails"
+private const val TRACK_SRC = "pick-tracks"
 
 /**
  * Full-screen "drop a pin" picker. Tap the map to place the marker (tap
  * again to move it); "Use my location" snaps it to the current GPS fix.
- * Returns the chosen (lat, lon) on Done.
+ * Returns the chosen (lat, lon) on Done. [trails]/[tracks], when given, are
+ * drawn as read-only context (same colours as the main map) so the user can
+ * place/move a point relative to the actual trail network instead of a
+ * blank map.
  */
 @Composable
 fun PointPickerScreen(
     title: String,
     hasLocation: Boolean,
     initial: Pair<Double, Double>? = null,
+    trails: List<TrailEntity> = emptyList(),
+    tracks: List<TrackEntity> = emptyList(),
     onDone: (Double, Double) -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -79,6 +91,25 @@ fun PointPickerScreen(
                 map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                     styleHolder[0] = style
                     mapUnavailable = false
+                    style.addSource(GeoJsonSource(TRAIL_SRC))
+                    style.addSource(GeoJsonSource(TRACK_SRC))
+                    style.addLayer(
+                        LineLayer("$TRAIL_SRC-line", TRAIL_SRC).withProperties(
+                            PropertyFactory.lineColor("#3C5A31"),
+                            PropertyFactory.lineWidth(3f),
+                            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                        )
+                    )
+                    style.addLayer(
+                        LineLayer("$TRACK_SRC-line", TRACK_SRC).withProperties(
+                            PropertyFactory.lineColor("#6D4C9C"),
+                            PropertyFactory.lineWidth(3f),
+                            PropertyFactory.lineDasharray(arrayOf(1.5f, 1f)),
+                            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                        )
+                    )
                     style.addSource(GeoJsonSource(SRC))
                     style.addLayer(
                         CircleLayer("$SRC-c", SRC).withProperties(
@@ -89,6 +120,8 @@ fun PointPickerScreen(
                         )
                     )
                     pushPoint(style, pointHolder[0])
+                    (style.getSource(TRAIL_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.trailFeatures(trails))
+                    (style.getSource(TRACK_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.trackFeatures(tracks))
                 }
                 map.addOnMapClickListener { p ->
                     pointHolder[0] = p.latitude to p.longitude
@@ -159,7 +192,11 @@ fun PointPickerScreen(
         }
         Box(Modifier.fillMaxSize()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize(), update = {
-                styleHolder[0]?.let { pushPoint(it, pointHolder[0]) }
+                styleHolder[0]?.let { style ->
+                    pushPoint(style, pointHolder[0])
+                    (style.getSource(TRAIL_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.trailFeatures(trails))
+                    (style.getSource(TRACK_SRC) as? GeoJsonSource)?.setGeoJson(MapGeo.trackFeatures(tracks))
+                }
             })
             if (mapUnavailable) {
                 com.asnidev.trailkeeperoffgrid.ui.map.WorldOutlineBackdrop(Modifier.fillMaxSize())

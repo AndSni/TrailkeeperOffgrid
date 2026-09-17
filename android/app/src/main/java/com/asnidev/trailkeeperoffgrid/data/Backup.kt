@@ -288,6 +288,7 @@ object Backup {
                                 s.name, "mtb",
                                 s.points.map { it.lat to it.lon },
                                 source = "imported",
+                                projectId = projectId,
                             )
                             trails++
                         }

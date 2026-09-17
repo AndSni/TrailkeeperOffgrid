@@ -27,6 +27,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * - v2 → v3: add `structure_types` (editable structure-type taxonomy,
  *   seeded with the app's original hardcoded list; `"other"` is the
  *   permanent fallback a deleted type's structures get reassigned to).
+ * - v3 → v4: add nullable `projectId` to `trails` and `structures` - a soft
+ *   link (like `trail_reports.projectId`, not a foreign key) recording which
+ *   project a trail/structure was created in, used by the map's "This
+ *   project" scope. Existing rows get NULL (no way to know retroactively).
  */
 @Database(
     entities = [
@@ -46,7 +50,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TrackEntity::class,
         StructureTypeEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class TrailkeeperDb : RoomDatabase() {
@@ -121,7 +125,22 @@ abstract class TrailkeeperDb : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        /** [MIGRATION_3_4]'s DDL — one `ALTER TABLE` per table, pulled out so
+         * `MigrationSqlTest` runs the exact same strings. Nullable column, no
+         * `DEFAULT` clause needed: SQLite already backfills NULL. */
+        const val ADD_TRAILS_PROJECT_ID_V4: String =
+            "ALTER TABLE `trails` ADD COLUMN `projectId` TEXT"
+        const val ADD_STRUCTURES_PROJECT_ID_V4: String =
+            "ALTER TABLE `structures` ADD COLUMN `projectId` TEXT"
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(ADD_TRAILS_PROJECT_ID_V4)
+                db.execSQL(ADD_STRUCTURES_PROJECT_ID_V4)
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
         /** A brand-new install creates `structure_types` straight from the
          * entity (no migration runs), so it still needs seeding here. */

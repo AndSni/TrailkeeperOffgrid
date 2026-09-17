@@ -28,6 +28,12 @@ data class ProjectEntity(
 data class TrailEntity(
     @PrimaryKey val id: String,
     val organisationId: String,
+    // Which project this trail was created in, if any - a soft link (not a
+    // foreign key) the same way TrailReportEntity.projectId works: the trail
+    // stays org-wide/shared and outlives the project, but the map's
+    // "This project" scope uses it as rule A. Null for anything created
+    // before this field existed, or via the org-wide backup/restore import.
+    val projectId: String?,
     val name: String,
     val activity: String,
     val difficulty: String,
@@ -148,6 +154,9 @@ data class SegmentWorkEntity(
 data class StructureEntity(
     @PrimaryKey val id: String,
     val organisationId: String,
+    // Soft link to the project this structure was created in - see
+    // TrailEntity.projectId for why it's nullable and not a foreign key.
+    val projectId: String?,
     val name: String,
     val structureType: String,
     val status: String,

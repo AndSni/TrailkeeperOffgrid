@@ -37,6 +37,8 @@ interface TrailDao {
     @Query("SELECT * FROM trails WHERE organisationId = :orgId ORDER BY name")
     suspend fun listForOrg(orgId: String): List<TrailEntity>
 
+    @Query("SELECT * FROM trails WHERE id = :id") suspend fun getById(id: String): TrailEntity?
+
     @Query("DELETE FROM trails WHERE id = :id") suspend fun deleteById(id: String)
 }
 

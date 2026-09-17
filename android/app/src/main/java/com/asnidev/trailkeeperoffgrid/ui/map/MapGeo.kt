@@ -1,5 +1,6 @@
 package com.asnidev.trailkeeperoffgrid.ui.map
 
+import com.asnidev.trailkeeperoffgrid.data.Geo
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
@@ -101,50 +102,59 @@ object MapGeo {
 
     /**
      * A project doesn't own trails or structures (they're org-wide, shared
-     * between projects), but its map should still be about the place it works.
-     * The working area is the extent of the project's own tasks + recorded
-     * tracks + the trails its tasks are attached to; a trail or structure
-     * counts as "this project's" when it's attached to a task or falls inside
-     * that (padded) extent.
+     * between projects) - a trail/structure counts as "this project's" when:
+     *  A. it was created while this project was active (its `projectId`
+     *     matches, or a task attaches to it via `nearestTrailId`), or
+     *  B. it's within [radiusM] metres of one of this project's own lines
+     *     (its recorded/imported tracks, plus its own (A) trails).
+     * [radiusM] is user-configurable ([com.asnidev.trailkeeperoffgrid.data.MapScopePrefs])
+     * since how close is "close enough" depends on the terrain/trail density.
      */
     fun projectScope(
+        projectId: String,
         trails: List<TrailEntity>,
         tasks: List<TaskEntity>,
         structures: List<StructureEntity>,
         tracks: List<TrackEntity>,
+        radiusM: Double,
     ): ProjectScope {
         val attachedTrailIds = tasks.mapNotNull { it.nearestTrailId }.toSet()
+        val ownTrailIds = trails.filter { it.projectId == projectId }.map { it.id }.toSet() + attachedTrailIds
 
-        val extentPts = ArrayList<LatLng>()
+        val ownLines =
+            (
+                tracks.map { it.geometryJson } +
+                    trails.filter { it.id in ownTrailIds }.map { it.geometryJson }
+            ).map { latLonPairs(it) }.filter { it.size >= 2 }
+
+        fun withinRadius(points: List<Pair<Double, Double>>): Boolean =
+            ownLines.isNotEmpty() &&
+                points.any { (lat, lon) -> ownLines.any { Geo.pointToPolylineM(lat, lon, it) <= radiusM } }
+
+        val trailIds =
+            ownTrailIds +
+                trails.filter { it.id !in ownTrailIds && withinRadius(latLonPairs(it.geometryJson)) }
+                    .map { it.id }
+
+        val ownStructureIds = structures.filter { it.projectId == projectId }.map { it.id }.toSet()
+        val structureIds =
+            ownStructureIds +
+                structures.filter { it.id !in ownStructureIds && withinRadius(latLonPairs(it.geometryJson)) }
+                    .map { it.id }
+
+        // Camera extent: everything now considered in-scope, plus the
+        // project's own tasks (so an empty-geometry task still gets framed).
+        val boundsPts = ArrayList<LatLng>()
         (
             tasks.mapNotNull { it.geometryJson } +
                 tracks.mapNotNull { it.geometryJson } +
-                trails.filter { it.id in attachedTrailIds }.mapNotNull { it.geometryJson }
-        ).forEach { collectPoints(it, extentPts) }
+                trails.filter { it.id in trailIds }.mapNotNull { it.geometryJson } +
+                structures.filter { it.id in structureIds }.mapNotNull { it.geometryJson }
+        ).forEach { collectPoints(it, boundsPts) }
 
-        if (extentPts.isEmpty()) {
-            // Nothing to focus on yet - treat the whole org layer as in-scope
-            // so the map falls back to the org extent and nothing is dimmed.
-            return ProjectScope(trails.map { it.id }.toSet(), structures.map { it.id }.toSet(), null)
-        }
+        val bounds = safeBounds(boundsPts)?.let { padBounds(it, 0.15) }
 
-        val raw = safeBounds(extentPts) ?: return ProjectScope(
-            trails.map { it.id }.toSet(),
-            structures.map { it.id }.toSet(),
-            null,
-        )
-        val padded = padBounds(raw, 0.25)
-
-        val trailIds =
-            attachedTrailIds +
-                trails.filter { it.geometryJson != null && anyPointIn(it.geometryJson, padded) }
-                    .map { it.id }
-        val structureIds =
-            structures.filter { it.geometryJson != null && anyPointIn(it.geometryJson, padded) }
-                .map { it.id }
-                .toSet()
-
-        return ProjectScope(trailIds, structureIds, padded)
+        return ProjectScope(trailIds, structureIds, bounds)
     }
 
     // --- helpers ------------------------------------------------------------
@@ -186,10 +196,13 @@ object MapGeo {
         else -> LatLngBounds.Builder().includes(pts).build()
     }
 
-    private fun anyPointIn(geometryJson: String, bounds: LatLngBounds): Boolean {
+    /** [lat,lon] pairs out of any geometry (Point / LineString / MultiLineString) -
+     * unlike [Geo.lineLatLon], also handles the Point geometry structures use. */
+    private fun latLonPairs(geometryJson: String?): List<Pair<Double, Double>> {
+        if (geometryJson == null) return emptyList()
         val pts = ArrayList<LatLng>()
         collectPoints(geometryJson, pts)
-        return pts.any { bounds.contains(it) }
+        return pts.map { it.latitude to it.longitude }
     }
 
     private fun collectPoints(geometryJson: String, into: MutableList<LatLng>) {

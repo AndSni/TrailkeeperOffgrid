@@ -149,9 +149,12 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
 
     // Trails/structures are org-wide; this frames the map to the project's
     // working area and dims assets outside it (unless "All assets" is on).
+    val scopeRadiusM by
+        com.asnidev.trailkeeperoffgrid.data.MapScopePrefs.radiusMFlow()
+            .collectAsState(initial = com.asnidev.trailkeeperoffgrid.data.MapScopePrefs.radiusM())
     val mapScope =
-        remember(s.trails, s.tasks, structures, tracks) {
-            MapGeo.projectScope(s.trails, s.tasks, structures, tracks)
+        remember(s.trails, s.tasks, structures, tracks, scopeRadiusM) {
+            MapGeo.projectScope(projectId, s.trails, s.tasks, structures, tracks, scopeRadiusM)
         }
 
     // Selected entity for the detail bottom-sheet: Pair(kind, id).
@@ -271,6 +274,8 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                             title = "Move \"${moveTask.title}\"",
                             hasLocation = hasLocation,
                             initial = geomLatLon(moveTask.geometryJson),
+                            trails = s.trails,
+                            tracks = tracks,
                             onDone = { lat, lon ->
                                 vm.moveTask(moveTask.id, lat, lon)
                                 movingTask = null
@@ -282,6 +287,8 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                             title = "Move \"${moveStructure.name}\"",
                             hasLocation = hasLocation,
                             initial = geomLatLon(moveStructure.geometryJson),
+                            trails = s.trails,
+                            tracks = tracks,
                             onDone = { lat, lon ->
                                 structuresVm.moveStructure(moveStructure.id, lat, lon)
                                 movingStructure = null
@@ -340,7 +347,7 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                             onDelete = { tr -> vm.deleteTrail(tr.id) },
                         )
                     tab == 4 -> SegmentWorkTab(workVm, s.trails, hasLocation)
-                    else -> StructuresTab(structuresVm, hasLocation)
+                    else -> StructuresTab(structuresVm, hasLocation, trails = s.trails, tracks = tracks)
                 }
             }
         }
@@ -402,20 +409,33 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                         structure != null ->
                             StructureDetailBody(
                                 structure = structure,
+                                inThisProject = structure.projectId == projectId,
                                 onShowOnMap = { focusOnMap(structure.geometryJson); selected = null },
                                 onPatch = { structuresVm.patchStructure(structure.id, it) },
                                 onMove = { movingStructure = structure; selected = null },
+                                onToggleProject = {
+                                    structuresVm.setStructureProject(
+                                        structure.id,
+                                        structure.projectId != projectId,
+                                    )
+                                },
                                 onDelete = { structuresVm.deleteStructure(structure.id); selected = null },
                             )
                         trail != null -> {
+                            val inThisProject = trail.projectId == projectId
                             Text(trail.name, style = MaterialTheme.typography.titleLarge)
                             Text(
                                 "${trail.activity} · ${trail.status.replace('_', ' ')} · ${km(trail.lengthM)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            OutlinedButton(onClick = { focusOnMap(trail.geometryJson); selected = null }) {
-                                Text("Show on map")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { focusOnMap(trail.geometryJson); selected = null }) {
+                                    Text("Show on map")
+                                }
+                                OutlinedButton(onClick = { vm.setTrailProject(trail.id, !inThisProject) }) {
+                                    Text(if (inThisProject) "Remove from this project" else "Add to this project")
+                                }
                             }
                         }
                         track != null -> {
@@ -533,9 +553,11 @@ private fun TaskNotesScreen(
 @Composable
 private fun StructureDetailBody(
     structure: StructureEntity,
+    inThisProject: Boolean,
     onShowOnMap: () -> Unit,
     onPatch: (StructurePatchRequest) -> Unit,
     onMove: () -> Unit,
+    onToggleProject: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val statuses = listOf("good", "monitor", "needs_repair", "failed", "decommissioned")
@@ -583,6 +605,9 @@ private fun StructureDetailBody(
             Text(if (structure.geometryJson == null) "Set location" else "Move")
         }
         if (structure.geometryJson != null) OutlinedButton(onClick = onShowOnMap) { Text("Show on map") }
+        OutlinedButton(onClick = onToggleProject) {
+            Text(if (inThisProject) "Remove from this project" else "Add to this project")
+        }
         Button(
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.error

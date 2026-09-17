@@ -143,6 +143,15 @@ class ProjectDetailViewModel(private val projectId: String) : ViewModel() {
         viewModelScope.launch { runCatching { LocalStore.deleteTrail(trailId) } }
     }
 
+    /** Manually attach/detach a trail that predates the `projectId` field
+     * (or was created elsewhere) to/from this project - see
+     * [LocalStore.setTrailProject]. */
+    fun setTrailProject(trailId: String, inThisProject: Boolean) {
+        viewModelScope.launch {
+            runCatching { LocalStore.setTrailProject(trailId, if (inThisProject) projectId else null) }
+        }
+    }
+
     fun uploadReportPhoto(reportId: String, jpeg: java.io.File) {
         viewModelScope.launch {
             runCatching { LocalStore.addReportPhoto(reportId, jpeg) }
@@ -215,7 +224,7 @@ class ProjectDetailViewModel(private val projectId: String) : ViewModel() {
             return
         }
         viewModelScope.launch {
-            runCatching { LocalStore.createTrail(name, activity, pts) }
+            runCatching { LocalStore.createTrail(name, activity, pts, projectId = projectId) }
                 .onSuccess { TrackRecorder.reset() }
                 .onFailure { e -> sync.update { it.copy(error = e.message ?: "Couldn't save the trail") } }
         }

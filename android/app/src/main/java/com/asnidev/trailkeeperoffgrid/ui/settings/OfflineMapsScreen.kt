@@ -31,27 +31,39 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Every country, grouped by continent, reachable from Settings → Offline
- * maps → "Browse all countries" — for anywhere the 3-entry quick list
- * doesn't cover. Same [RegionRow] / [OfflineMaps.download] the quick list
- * uses; a large country may hit MapLibre's tile-count limit in one go
- * (surfaced as the existing "too large — try a smaller region" message).
+ * maps → "Browse all countries". Also folds in any hand-picked "quick"
+ * region that isn't already a whole country (e.g. "Riga & Vidzeme" - a
+ * sub-country test area) into its own group at the top, so removing the
+ * old always-visible quick-preset list from the main Settings screen
+ * doesn't make that region unreachable. Same [RegionRow] /
+ * [OfflineMaps.download] both use; a large country may hit MapLibre's
+ * tile-count limit in one go (surfaced as the existing "too large — try a
+ * smaller region" message).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfflineMapsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
     val countries by vm.countries.collectAsState()
+    val quickPresets by vm.quickPresets.collectAsState()
     val downloaded by vm.downloadedRegions.collectAsState()
     val downloads by vm.downloads.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
 
     // countries is already continent-then-name sorted (home continent
     // first); groupBy preserves that iteration order for both the groups
-    // and the rows within each group.
-    val grouped = remember(countries, query) {
+    // and the rows within each group. Quick presets whose id duplicates a
+    // real country (Latvia/Estonia/Lithuania are quick presets AND full
+    // countries) are dropped here - they're already reachable below.
+    val grouped = remember(countries, quickPresets, query) {
+        val countryIds = countries.map { it.id }.toSet()
+        val quick = quickPresets.filter { it.id !in countryIds }
+        val all = quick.map { it.copy(continent = "Quick") } + countries
         val filtered =
-            if (query.isBlank()) countries
-            else countries.filter { it.name.contains(query, ignoreCase = true) }
-        filtered.groupBy { it.continent.ifBlank { "Other" } }.toList()
+            if (query.isBlank()) all
+            else all.filter { it.name.contains(query, ignoreCase = true) }
+        filtered.groupBy { it.continent.ifBlank { "Other" } }
+            .toList()
+            .sortedBy { (continent, _) -> if (continent == "Quick") 0 else 1 }
     }
 
     Scaffold(
