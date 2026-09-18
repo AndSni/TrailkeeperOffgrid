@@ -18,17 +18,23 @@ Repo: https://github.com/AndSni/TrailkeeperOffgrid.git
 # developer-signed APK, so F-Droid's reproducible-build check can diff
 # its from-source build against it.
 Binaries: https://github.com/AndSni/TrailkeeperOffgrid/releases/download/v%v/TrailkeeperOffgrid.apk
-AllowedAPKSigningKeys: a931a9954c4cf37bef40b272fee9dadfd233d57accb0e82286c2dac7705ab79d
 
 Builds:
-  - versionName: "0.3.9"
+  - versionName: 0.3.9
     versionCode: 17
     commit: 332bd7f07b1e27bc54c19c4a1a7ce19a59f6aa51
-    subdir: android
+    # android/ is the Gradle root (gradlew lives here); the app module -
+    # and its build/outputs/apk/release/ - is android/app. F-Droid's
+    # build tooling searches for the output APK directly under `subdir`,
+    # not under a nested app/ inside it, so this must point at the
+    # module itself, not the Gradle invocation root.
+    subdir: android/app
     gradle:
-      - "yes"
+      - yes
+
+AllowedAPKSigningKeys: a931a9954c4cf37bef40b272fee9dadfd233d57accb0e82286c2dac7705ab79d
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: "0.3.9"
+CurrentVersion: 0.3.9
 CurrentVersionCode: 17
