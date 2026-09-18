@@ -1,0 +1,88 @@
+name: release-tag
+
+# Builds a signed release APK for a pushed version tag (v1.2.3) and publishes
+# it as a permanent, per-version GitHub Release at that same tag. Distinct
+# from release.yml's rolling `latest` release: F-Droid's reproducible-build
+# check (Binaries + AllowedAPKSigningKeys in .fdroid.yml) needs a stable,
+# never-overwritten URL per version to diff its from-source build against,
+# which the rolling release can't provide since it's replaced on every push.
+#
+# Signing secrets (optional — without them the APK is debug-signed, which
+# won't match AllowedAPKSigningKeys and so won't satisfy reproducible-build
+# verification, but still installs):
+#   RELEASE_KEYSTORE_B64      base64 of the .jks
+#   RELEASE_KEYSTORE_PASSWORD store password
+#   RELEASE_KEY_ALIAS         key alias
+#   RELEASE_KEY_PASSWORD      key password
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re-)publish a release for"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure release signing
+        working-directory: android
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > release.jks
+            {
+              echo "storeFile=$(pwd)/release.jks"
+              echo "storePassword=$KS_PASS"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "keyPassword=$KEY_PASS"
+            } > keystore.properties
+            echo "Release signing configured."
+          else
+            echo "No RELEASE_KEYSTORE_B64 secret — APK will be debug-signed."
+          fi
+
+      - name: Assemble release
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Stage APK for release
+        id: stage
+        run: |
+          set -e
+          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          VNAME=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          echo "vname=$VNAME" >> "$GITHUB_OUTPUT"
+          mkdir -p release-artifacts
+          cp "$APK" "release-artifacts/TrailkeeperOffgrid.apk"
+
+      - name: Publish versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          gh release create "$TAG" \
+            "release-artifacts/TrailkeeperOffgrid.apk" \
+            --title "Trailkeeper Offgrid ${{ steps.stage.outputs.vname }}" \
+            --notes "See metadata/en-US/changelogs/ for what changed. Install: https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/TrailkeeperOffgrid.apk"

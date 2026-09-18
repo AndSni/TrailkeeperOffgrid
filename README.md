@@ -286,14 +286,29 @@ keyPassword=…
 
 ### F-Droid
 
+Submission MR: <https://gitlab.com/fdroid/fdroiddata/-/merge_requests/49328>.
+
 Release APKs are attached to GitHub Releases only, never committed into the
 repo — F-Droid builds the APK itself from a tagged commit, and a source
 repo with binaries baked into its history is exactly what that process
-disallows. Each release is tagged (e.g. `v0.3.7`) to give a stable
-inclusion target.
+disallows. Each release is tagged (e.g. `v0.3.9`) to give a stable
+inclusion target; `release-tag.yml` fires on that tag push and publishes a
+**permanent**, never-overwritten GitHub Release at the same tag (distinct
+from `release.yml`'s rolling `latest` release, which gets replaced on every
+push to `main`). `.fdroid.yml`'s `Binaries` + `AllowedAPKSigningKeys` point
+at that per-tag release so F-Droid's reproducible-build check can diff its
+from-source build against the actual developer-signed APK.
 
-The build recipe lives in this repo as [`.fdroid.yml`](.fdroid.yml), so
-including it on F-Droid is just a merge request to `fdroiddata` that points
-at this repo — no separate recipe to maintain there. No non-free
-dependencies, trackers, or ad SDKs anywhere in the tree; see
-`metadata/en-US/full_description.txt`.
+The build recipe lives in this repo as [`.fdroid.yml`](.fdroid.yml); the
+`fdroiddata` submission (`metadata/com.trailkeeperoffgrid.app.yml` there)
+duplicates it rather than pointing at it, since that's what reviewers
+actually want to see for a new-app MR. Keep the two in sync by hand on
+every release. No non-free dependencies, trackers, or ad SDKs anywhere in
+the tree; see `metadata/en-US/full_description.txt`.
+
+**The release signing key (`keystore.properties` / the `.jks` it points
+at, held only as the `RELEASE_KEYSTORE_B64` GitHub secret) has no backup
+copy documented anywhere in this repo or its docs as of 2026-09-18. Losing
+it means every future release stops being installable as an update over
+existing installs, and breaks `AllowedAPKSigningKeys` verification. Back
+it up somewhere durable before doing anything else with signing.**

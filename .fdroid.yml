@@ -4,7 +4,7 @@ License: GPL-3.0-only
 AuthorName: AndSni
 SourceCode: https://github.com/AndSni/TrailkeeperOffgrid
 IssueTracker: https://github.com/AndSni/TrailkeeperOffgrid/issues
-Changelog: https://github.com/AndSni/TrailkeeperOffgrid/blob/main/metadata/en-US/changelogs/%c.txt
+Changelog: https://github.com/AndSni/TrailkeeperOffgrid/blob/HEAD/metadata/en-US/changelogs/%c.txt
 
 RepoType: git
 Repo: https://github.com/AndSni/TrailkeeperOffgrid.git
@@ -13,22 +13,17 @@ Repo: https://github.com/AndSni/TrailkeeperOffgrid.git
 # metadata/en-US/{short_description,full_description}.txt in this repo is
 # the single source of truth; duplicating the text here would just drift.
 
+# Each tagged release also publishes a GitHub Release at the same tag
+# name (.github/workflows/release-tag.yml) carrying the identical,
+# developer-signed APK, so F-Droid's reproducible-build check can diff
+# its from-source build against it.
+Binaries: https://github.com/AndSni/TrailkeeperOffgrid/releases/download/v%v/TrailkeeperOffgrid.apk
+AllowedAPKSigningKeys: a931a9954c4cf37bef40b272fee9dadfd233d57accb0e82286c2dac7705ab79d
+
 Builds:
-  - versionName: "0.3.7"
-    versionCode: 15
-    commit: v0.3.7
-    subdir: android
-    gradle:
-      - "yes"
-  - versionName: "0.3.8"
-    versionCode: 16
-    commit: v0.3.8
-    subdir: android
-    gradle:
-      - "yes"
   - versionName: "0.3.9"
     versionCode: 17
-    commit: v0.3.9
+    commit: 332bd7f07b1e27bc54c19c4a1a7ce19a59f6aa51
     subdir: android
     gradle:
       - "yes"
