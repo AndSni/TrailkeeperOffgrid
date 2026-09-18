@@ -29,6 +29,17 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.10** — F-Droid build fix:
+
+- Disabled AGP's automatic "dependency metadata" block
+  (`dependenciesInfo { includeInApk = false; includeInBundle = false }`)
+  in release builds. AGP embeds this Play Console reporting block in
+  every release APK/AAB by default since 7.4 - unused and unwanted
+  here, since this app isn't distributed through Play, and F-Droid's
+  security scanner correctly flags any unexpected extra block in a
+  signing payload. Caught during F-Droid submission review; no
+  user-facing changes.
+
 **v0.3.9** — device-to-device sharing:
 
 - **Share a project, task, route, trail, or structure** straight to

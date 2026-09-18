@@ -30,8 +30,8 @@ android {
         applicationId = "com.trailkeeperoffgrid.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.3.9"
+        versionCode = 18
+        versionName = "0.3.10"
         // No API base URLs: Trailkeeper Offgrid has no backend. The only
         // network use is the optional map-region download and update check
         // (see docs/BLUEPRINT.md sec 5 / 7.6), which use absolute URLs.
@@ -57,6 +57,16 @@ android {
                 if (keystoreProperties.isNotEmpty()) signingConfigs.getByName("release")
                 else signingConfigs.getByName("debug")
         }
+    }
+
+    // AGP embeds a Play Console "dependency metadata" block into every
+    // release APK/AAB by default (since 7.4) - an extra signing-block
+    // payload F-Droid's scanner correctly flags as unexpected content in a
+    // signed release. Not used, not wanted: this app isn't distributed
+    // through Play.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     compileOptions {

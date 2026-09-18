@@ -1,0 +1,1 @@
+F-Droid build fix: disabled AGP's automatic "dependency metadata" block in release builds (a Play Console reporting feature, unused since this app isn't distributed through Play) - F-Droid's security scanner correctly flagged it as an unexpected extra signing block in the previous release. No user-facing changes.
