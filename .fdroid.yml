@@ -1,0 +1,33 @@
+Categories:
+  - Navigation
+License: GPL-3.0-only
+AuthorName: AndSni
+SourceCode: https://github.com/AndSni/TrailkeeperOffgrid
+IssueTracker: https://github.com/AndSni/TrailkeeperOffgrid/issues
+Changelog: https://github.com/AndSni/TrailkeeperOffgrid/blob/main/metadata/en-US/changelogs/%c.txt
+
+RepoType: git
+Repo: https://github.com/AndSni/TrailkeeperOffgrid.git
+
+# Summary/Description are intentionally omitted - fastlane-structured
+# metadata/en-US/{short_description,full_description}.txt in this repo is
+# the single source of truth; duplicating the text here would just drift.
+
+Builds:
+  - versionName: "0.3.7"
+    versionCode: 15
+    commit: v0.3.7
+    subdir: android
+    gradle:
+      - "yes"
+  - versionName: "0.3.8"
+    versionCode: 16
+    commit: v0.3.8
+    subdir: android
+    gradle:
+      - "yes"
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: "0.3.8"
+CurrentVersionCode: 16

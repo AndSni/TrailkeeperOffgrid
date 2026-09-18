@@ -10,12 +10,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- The app runs fully offline. INTERNET is only used, opportunistically,
-         to pre-download map regions and check for a newer APK (Settings). -->
+         to stream/pre-download map regions (Settings -> Offline maps). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"

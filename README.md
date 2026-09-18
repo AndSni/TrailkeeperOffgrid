@@ -28,6 +28,57 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.7** — map-scope correctness and usability pass:
+
+- **"This project" map filter actually filters now.** It used to dim
+  trails/structures via a padded bounding box loose enough that almost
+  nothing was ever excluded. Replaced with a real rule: a trail/structure
+  counts as this project's if it was created here (new nullable
+  `projectId` on `trails`/`structures`, Room v3→v4 migration) or falls
+  within a distance of one of this project's own tracks/trails, computed
+  with actual point-to-line geometry rather than a bounding box. That
+  distance is now user-configurable (Settings → Map), since "close
+  enough" depends on how dense the local trail network is. Older
+  trails/structures that predate `projectId` can be manually attached to
+  a project from their detail sheet ("Add to this project").
+- **Map marker size**, also configurable in Settings → Map — the default
+  task/structure/report dots were too small to comfortably tap.
+- **Move/place-a-point screen** (move a task or structure, add a
+  structure) now draws the project's trails/tracks as context instead of
+  a blank map.
+- **A moved task's new position now shows up immediately** on the map.
+  The map fully remounts on the round-trip through the move screen, and
+  its one-time async style-load callback could lock in a stale data
+  snapshot from the instant of remount if it raced the (near-instant)
+  database write — the map now always reads the latest data at push
+  time instead of whatever was true when it was first created.
+- **Settings → Offline maps** no longer permanently shows the Baltic
+  quick-preset list; it shows your downloaded regions plus "Browse all
+  countries", with the one non-country quick region folded into that
+  browse screen.
+- **Settings → About** gained a short note from the developer and a
+  Ko-fi support link.
+
+**v0.3.6** — GPX, photos, and theming pass:
+
+- **GPX import** split into separate Route-tab and Trails-tab buttons,
+  each importing the whole file as that type — the previous per-tag
+  auto-detection failed on nearly every real-world GPX file, which is
+  almost always written as `<trk>` regardless of what the line
+  conceptually is.
+- **Camera capture for task/report photos** — "+" now offers "Take
+  photo" or "Choose from gallery" instead of gallery only.
+- **Task list card** rebuilt into a clearer 3-row layout (urgency /
+  title / status + photo + comment + mark-done), with an
+  urgency-coloured open status.
+- **Light theme + 5 accent colours**, user-selectable in Settings —
+  the app was dark-only before.
+- **Task/structure/trail detail sheet** now opens fully expanded and
+  scrolls, instead of resting half-height with its bottom buttons
+  crowded under the drag handle.
+- **Hold-to-delete** added for recorded routes and trails, matching the
+  existing project-card gesture.
+
 **v0.3.5** — security and cleanup pass:
 
 - **Backup restore hardened.** Restoring a workspace `.zip` (Settings →
@@ -213,5 +264,11 @@ keyPassword=…
 Release APKs are attached to GitHub Releases only, never committed into the
 repo — F-Droid builds the APK itself from a tagged commit, and a source
 repo with binaries baked into its history is exactly what that process
-disallows. Each release is tagged (e.g. `v0.3.5`) to give a stable
+disallows. Each release is tagged (e.g. `v0.3.7`) to give a stable
 inclusion target.
+
+The build recipe lives in this repo as [`.fdroid.yml`](.fdroid.yml), so
+including it on F-Droid is just a merge request to `fdroiddata` that points
+at this repo — no separate recipe to maintain there. No non-free
+dependencies, trackers, or ad SDKs anywhere in the tree; see
+`metadata/en-US/full_description.txt`.

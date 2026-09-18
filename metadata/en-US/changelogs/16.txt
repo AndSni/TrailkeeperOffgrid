@@ -1,0 +1,1 @@
+F-Droid submission prep: added a self-hosted build recipe (.fdroid.yml), disabled Android's automatic cloud backup (the app already has its own explicit backup/restore in Settings, and everything is meant to stay only on this phone unless you export it yourself), and corrected a stale comment about network use. No user-facing feature changes.
