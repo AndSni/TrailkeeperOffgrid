@@ -24,7 +24,7 @@ Binaries:
 Builds:
   - versionName: 0.3.10
     versionCode: 18
-    commit: PLACEHOLDER_FILLED_IN_AFTER_PUSH
+    commit: 1b7170140af0975ba6bc3017270bc1926ea2a713
     # android/ is the Gradle root (gradlew lives here); the app module -
     # and its build/outputs/apk/release/ - is android/app. F-Droid's
     # build tooling searches for the output APK directly under `subdir`,
