@@ -196,8 +196,14 @@ object Backup {
             }
         }
 
-    private inline fun <reified T> list(json: String): List<T> =
-        plain.fromJson(json, Array<T>::class.java).toList()
+    // TypeToken.getParameterized, not Array<T>::class.java: the array-class
+    // trick was found on-device to hand Gson a type it resolves to raw
+    // LinkedTreeMap elements instead of T (see ShareBundle.kt), which made
+    // every restore fail with a ClassCastException.
+    private inline fun <reified T> list(json: String): List<T> {
+        val type = com.google.gson.reflect.TypeToken.getParameterized(List::class.java, T::class.java).type
+        return plain.fromJson(json, type)
+    }
 
     // ---- GPX (routes & trails) -------------------------------------
 

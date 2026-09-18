@@ -39,6 +39,9 @@ interface TrailDao {
 
     @Query("SELECT * FROM trails WHERE id = :id") suspend fun getById(id: String): TrailEntity?
 
+    @Query("SELECT * FROM trails WHERE projectId = :projectId ORDER BY name")
+    suspend fun listForProject(projectId: String): List<TrailEntity>
+
     @Query("DELETE FROM trails WHERE id = :id") suspend fun deleteById(id: String)
 }
 
@@ -50,6 +53,9 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks WHERE projectId = :projectId ORDER BY title")
     fun observeForProject(projectId: String): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE projectId = :projectId ORDER BY title")
+    suspend fun listForProject(projectId: String): List<TaskEntity>
 
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: String): TaskEntity?
 
@@ -125,6 +131,9 @@ interface StructureDao {
 
     @Query("SELECT * FROM structures WHERE organisationId = :orgId")
     suspend fun listForOrg(orgId: String): List<StructureEntity>
+
+    @Query("SELECT * FROM structures WHERE projectId = :projectId ORDER BY name")
+    suspend fun listForProject(projectId: String): List<StructureEntity>
 
     @Query("DELETE FROM structures WHERE id = :id") suspend fun deleteById(id: String)
 
@@ -206,6 +215,11 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks WHERE projectId = :projectId ORDER BY startedAt DESC")
     fun observeForProject(projectId: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks WHERE projectId = :projectId ORDER BY startedAt DESC")
+    suspend fun listForProject(projectId: String): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE id = :id") suspend fun getById(id: String): TrackEntity?
 
     @Query("DELETE FROM tracks WHERE id = :id") suspend fun deleteById(id: String)
 

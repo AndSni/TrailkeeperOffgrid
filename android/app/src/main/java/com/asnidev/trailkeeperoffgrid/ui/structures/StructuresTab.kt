@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
+import com.asnidev.trailkeeperoffgrid.data.ShareBundle
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionEntity
 import com.asnidev.trailkeeperoffgrid.data.local.InspectionFormEntity
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
@@ -66,6 +69,7 @@ import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.model.StructurePatchRequest
 import com.asnidev.trailkeeperoffgrid.ui.common.PointPickerScreen
+import com.asnidev.trailkeeperoffgrid.ui.share.launchShare
 import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +86,8 @@ fun StructuresTab(
     val inspections by vm.inspections.collectAsState()
     val saving by vm.saving.collectAsState()
     val message by vm.message.collectAsState()
+    val context = LocalContext.current
+    val shareScope = rememberCoroutineScope()
 
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
     var editingStructure by remember { mutableStateOf<StructureEntity?>(null) }
@@ -196,13 +202,18 @@ fun StructuresTab(
                         }
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 StatusTag(s.status)
                                 Text(
                                     s.name,
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(start = 8.dp),
+                                    modifier = Modifier.padding(start = 8.dp).weight(1f),
                                 )
+                                IconButton(
+                                    onClick = { shareScope.launchShare(context) { ShareBundle.exportStructure(context, s.id) } },
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share structure", modifier = Modifier.size(18.dp))
+                                }
                             }
                             Text(
                                 buildString {

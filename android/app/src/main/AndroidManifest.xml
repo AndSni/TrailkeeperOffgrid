@@ -29,6 +29,38 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Receiving a .tkshare bundle (ShareBundle.kt) sent from
+                 another Trailkeeper Offgrid device. Matched primarily by
+                 our vendor MIME type, which survives a direct share-sheet
+                 hop (Bluetooth, Quick Share, most messaging apps). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.trailkeeper.share+zip" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="application/vnd.trailkeeper.share+zip" />
+            </intent-filter>
+            <!-- Fallback: a transport that saved the file to storage lost
+                 the MIME type (Android has no way to register a custom
+                 extension's MIME type system-wide, so it falls back to
+                 octet-stream) - match by the .tkshare extension instead.
+                 ShareBundle.peek() validates the manifest.json marker
+                 before importing anything, so a false-positive match on an
+                 unrelated file just shows an error, not a bad import. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.tkshare" />
+            </intent-filter>
         </activity>
 
         <service

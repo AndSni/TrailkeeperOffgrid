@@ -401,9 +401,14 @@ collection) treat as table stakes and Trailkeeper lacks:
 - **Go-to-coordinates + multi-format coordinate display** — decimal, DMS, UTM,
   MGRS. A formatter + a "jump to coords" box on the map. Land managers and
   crews communicate in these.
-- **Single-waypoint share** — export one task / structure / dropped pin as a
-  tiny GPX or a `geo:` URI / plus-code, so a crew member on another phone gets
-  the exact spot with no network. Pairs with import.
+- ~~Single-waypoint share~~ — **done, broader than scoped (v0.3.9).** Any
+  project, task, route, trail, or structure exports as a `.tkshare` bundle
+  (JSON + referenced photos) via the OS share sheet, with an import-preview
+  screen on the receiving end (`ShareBundle.kt`). A lighter-weight
+  no-share-sheet path (a tiny `geo:` URI / plus-code for just a dropped pin,
+  scannable as a QR code) is still a plausible smaller follow-up if the
+  share-sheet flow turns out to be too many taps for a quick "here's the
+  spot" handoff in the field.
 - **Standalone map ruler** — ad-hoc distance / area measurement not tied to a
   segment-work record. `SegmentMeasureScreen` already has the geometry math;
   expose it as its own mode.
@@ -454,7 +459,7 @@ Each phase compiles, installs on a real device, and is usable.
 | **P1** | De-server the data layer | Rip out auth + `network/` + outbox/sync tables. `SyncRepository` → `LocalRepository` (same surface, Room-only). On-device derived values (lengths, areas, nearest-trail, rollups). Real migrations + `exportSchema=true` + a migration-test harness. Local job-type seed. App opens straight to the project list; full local CRUD across tasks / trails / structures / segment-work / tracks / notebook. | 1–2 wk |
 | **P2** | Offline maps | PMTiles spike (§5.5); vendored `style.json` + glyphs + sprite; local `pmtiles://` source; **Settings → Offline maps** (region manifest, resumable sha256-checked download, list/update/delete, storage readout); Latvia + Baltics prebuilt as raw-URL release assets (`tiles.yml` or documented Planetiler run); raster `.mbtiles` import fallback; bundled low-zoom starter tiles. | 1–2 wk |
 | **P3** | Settings: identity, cleanup, backup | DataStore `display_name` threaded through attributions + GPX author + export names. **DB cleanup** (purge photos of done tasks, trim old track points, storage breakdown). **Backup/Restore** (workspace zip export/restore via SAF, "last backup" line + weekly nag). Per-entity GPX/GeoJSON export + GPX/GeoJSON import. | 1 wk |
-| **P4** | Off-grid field features | Track-back / return-to-start; go-to-coords + DMS/UTM/MGRS display; standalone map ruler; bearing-to-feature; single-waypoint GPX/`geo:` share; recording robustness (cadence, checkpoint, unsaved guard); keep-screen-on + field-contrast pass; elevation profile; local inspection-due / task-overdue reminders (`WorkManager`). | 1–2 wk |
+| **P4** | Off-grid field features | Track-back / return-to-start; go-to-coords + DMS/UTM/MGRS display; standalone map ruler; bearing-to-feature; ~~single-waypoint GPX/`geo:` share~~ done broader as full device-to-device sharing (v0.3.9, §8.1); recording robustness (cadence, checkpoint, unsaved guard); keep-screen-on + field-contrast pass; elevation profile; local inspection-due / task-overdue reminders (`WorkManager`). | 1–2 wk |
 | **P5** | Trail condition reporting | Lightweight `TrailReport` (status / type / severity / photo / GPS), its own map layer + list + export column. Optional contour/hillshade overlay toggle; optional daylight-remaining, graticule, scale bar, offline search. | 3–5 d |
 | **P6** | Harden & field beta | Real-device runs (the Sony XQ-CC54 / HQ-series devices already in rotation); battery soak on a live recording; migration tests green; tag `v0.1.0`; user guide (install by URL, download a region, back up). | ongoing |
 

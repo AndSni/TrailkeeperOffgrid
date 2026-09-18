@@ -1,5 +1,6 @@
 package com.asnidev.trailkeeperoffgrid
 
+import android.net.Uri
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -23,6 +24,7 @@ import com.asnidev.trailkeeperoffgrid.ui.notifications.NotificationsScreen
 import com.asnidev.trailkeeperoffgrid.ui.projects.ProjectDetailScreen
 import com.asnidev.trailkeeperoffgrid.ui.projects.ProjectListScreen
 import com.asnidev.trailkeeperoffgrid.ui.settings.SettingsScreen
+import com.asnidev.trailkeeperoffgrid.ui.share.ImportScreen
 import kotlinx.coroutines.delay
 
 private data class OpenProject(val id: String, val name: String)
@@ -43,7 +45,7 @@ private const val SPLASH_MILLIS = 2000L
  * colour (see themes.xml), so there's no flash before this draws.
  */
 @Composable
-fun TrailkeeperApp() {
+fun TrailkeeperApp(pendingImportUri: Uri? = null) {
     var showSplash by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         delay(SPLASH_MILLIS)
@@ -51,7 +53,7 @@ fun TrailkeeperApp() {
     }
 
     Crossfade(targetState = showSplash, label = "splash") { splash ->
-        if (splash) SplashScreen() else MainNav()
+        if (splash) SplashScreen() else MainNav(pendingImportUri)
     }
 }
 
@@ -67,14 +69,19 @@ private fun SplashScreen() {
     }
 }
 
+private val uriSaver: Saver<Uri?, String> =
+    Saver(save = { it?.toString() ?: "" }, restore = { if (it.isEmpty()) null else Uri.parse(it) })
+
 @Composable
-private fun MainNav() {
+private fun MainNav(initialImportUri: Uri? = null) {
     var open by rememberSaveable(stateSaver = openProjectSaver) { mutableStateOf<OpenProject?>(null) }
     var showNotifications by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var importUri by rememberSaveable(stateSaver = uriSaver) { mutableStateOf(initialImportUri) }
 
     val current = open
     when {
+        importUri != null -> ImportScreen(uri = importUri!!, onDone = { importUri = null })
         showSettings -> SettingsScreen(onBack = { showSettings = false })
         showNotifications -> NotificationsScreen(onBack = { showNotifications = false })
         current != null ->

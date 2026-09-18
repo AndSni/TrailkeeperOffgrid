@@ -3,4 +3,7 @@
     <!-- Camera captures a photo here before it's read back, compressed, and
          copied into the app's own photos/<id>/ storage. -->
     <cache-path name="camera_captures" path="camera_captures/" />
+    <!-- Scoped share bundles (ShareBundle.kt) written here before being
+         handed to the OS share sheet. -->
+    <cache-path name="shares" path="shares/" />
 </paths>

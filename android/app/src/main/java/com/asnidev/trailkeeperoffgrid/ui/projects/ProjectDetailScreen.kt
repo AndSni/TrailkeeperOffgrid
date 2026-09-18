@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -95,11 +96,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Gpx
+import com.asnidev.trailkeeperoffgrid.data.ShareBundle
 import com.asnidev.trailkeeperoffgrid.data.local.StructureEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TaskEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.location.freshLocation
+import com.asnidev.trailkeeperoffgrid.ui.share.launchShare
 import com.google.gson.JsonParser
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -212,6 +215,9 @@ fun ProjectDetailScreen(projectId: String, projectName: String, onBack: () -> Un
                     }
                 },
                 actions = {
+                    IconButton(onClick = { scope.launchShare(context) { ShareBundle.exportProject(context, projectId) } }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share project")
+                    }
                     IconButton(onClick = vm::refresh, enabled = !s.syncing) {
                         Icon(Icons.Default.Refresh, contentDescription = "Sync")
                     }
@@ -751,6 +757,8 @@ private fun TaskList(
     onSetStatus: (String, String) -> Unit,
     onOpen: (TaskEntity) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     if (tasks.isEmpty()) {
         EmptyHint("No tasks in this project yet. Tap + to add one.")
         return
@@ -828,6 +836,9 @@ private fun TaskList(
                                     )
                                 }
                             }
+                        }
+                        IconButton(onClick = { scope.launchShare(context) { ShareBundle.exportTask(context, t.id) } }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share task", modifier = Modifier.size(18.dp))
                         }
                         if (done) {
                             TextButton(onClick = { onSetStatus(t.id, "open") }) { Text("Reopen") }
@@ -922,7 +933,12 @@ private fun TrailList(
                 },
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(tr.name, style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { scope.launchShare(context) { ShareBundle.exportTrail(context, tr.id) } }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share trail", modifier = Modifier.size(18.dp))
+                        }
+                    }
                     Text(
                         "${tr.activity} · ${tr.status.replace('_', ' ')} · ${km(tr.lengthM)}",
                         style = MaterialTheme.typography.labelMedium,

@@ -1,4 +1,4 @@
-Trailkeeper Offgrid is a field app for trail maintenance crews and volunteers who work where there's no signal. Everything runs on the phone: no account, no backend, no sync, and no data leaves the device except an optional map-tile download.
+Trailkeeper Offgrid is a field app for trail maintenance crews and volunteers who work where there's no signal. Everything runs on the phone: no account, no backend, no sync, and no data leaves the device except an optional map-tile download or something you explicitly choose to share.
 
 Track your work:
 * Projects group trails, tasks, structures, and work logs for an area.
@@ -14,6 +14,7 @@ Built for no signal:
 * Local reminders nudge you about overdue inspections and tasks - no server round-trip required.
 
 Your data stays yours:
+* Share a single project, task, route, trail, or structure straight to a teammate's phone through the normal share sheet (Bluetooth, Quick Share, email, whatever you've already got) - they get a preview before anything is imported, never a silent merge.
 * A full-workspace backup is a single .zip file you control - back it up, move it to a new phone, or hand it to a teammate.
 * Import and export routes and trails as GPX, so this plays well with other GPS tools.
 * Multi-format coordinates (decimal, DMS, UTM) with one-tap copy, for radioing a position or dropping it into another app.

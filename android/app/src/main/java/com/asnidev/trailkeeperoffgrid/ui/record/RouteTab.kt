@@ -46,13 +46,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.rotate
 import com.asnidev.trailkeeperoffgrid.data.Backup
 import com.asnidev.trailkeeperoffgrid.data.Geo
 import com.asnidev.trailkeeperoffgrid.data.Gpx
 import com.asnidev.trailkeeperoffgrid.data.Identity
 import com.asnidev.trailkeeperoffgrid.data.LocalStore
+import com.asnidev.trailkeeperoffgrid.data.ShareBundle
 import com.asnidev.trailkeeperoffgrid.data.TrailReports
 import com.asnidev.trailkeeperoffgrid.data.local.TrackEntity
 import com.asnidev.trailkeeperoffgrid.data.local.TrailReportEntity
@@ -64,6 +67,7 @@ import com.asnidev.trailkeeperoffgrid.record.RecPoint
 import com.asnidev.trailkeeperoffgrid.record.TrackRecorder
 import com.asnidev.trailkeeperoffgrid.record.TrackRecordingService
 import com.asnidev.trailkeeperoffgrid.location.freshLocation
+import com.asnidev.trailkeeperoffgrid.ui.share.launchShare
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -373,9 +377,18 @@ private fun TrackCard(t: TrackEntity, onLongPressDelete: () -> Unit) {
         },
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SourceTag(t.source)
-                Text(t.name, style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SourceTag(t.source)
+                    Text(t.name, style = MaterialTheme.typography.titleMedium)
+                }
+                IconButton(onClick = { scope.launchShare(context) { ShareBundle.exportRoute(context, t.id) } }) {
+                    Icon(Icons.Default.Share, contentDescription = "Share route", modifier = Modifier.size(18.dp))
+                }
             }
             Text(
                 "${fmtKm(t.lengthM)} · ${t.pointCount} points" +

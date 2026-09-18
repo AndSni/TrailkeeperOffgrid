@@ -6,7 +6,8 @@ recording, structures & inspections, and segment-timed work — the whole
 Trailkeeper field app, but with **no backend, no account, no sync**.
 Everything lives on the phone. Maps are pre-downloaded to phone storage. The
 only bridge to the outside world is file export/import (GPX, GeoJSON, CSV, a
-backup zip).
+backup zip) and device-to-device sharing of a single project, task, route,
+trail, or structure through the normal OS share sheet.
 
 Derived from [Trailkeeper](https://github.com/AndSni/Trailkeeper). Full plan
 and rationale: [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md).
@@ -27,6 +28,30 @@ already use on Play; the internal code package stays
 `com.asnidev.trailkeeperoffgrid` (Gradle `namespace`, untouched by this).
 
 ## Status
+
+**v0.3.9** — device-to-device sharing:
+
+- **Share a project, task, route, trail, or structure** straight to
+  another phone through the OS share sheet (Bluetooth, Quick Share,
+  email, whatever's already on hand). A Share icon on the relevant
+  screen/row builds a small `.tkshare` bundle — a zip of JSON tables plus
+  any referenced photos — via the new `ShareBundle.kt`. Opening a
+  received bundle (direct share, or "Open with" from a file manager)
+  lands on an "Import share" preview before anything touches the
+  database; when the shared item's project isn't on this device yet,
+  you're asked to attach it to an existing project or create a new one,
+  rather than a stub project appearing silently.
+- **Restore backup was silently failing — fixed.** `Backup.kt`'s
+  whole-workspace restore used a Gson generic-deserialization trick
+  (`Array<T>::class.java` for a reified type parameter) that, on-device,
+  handed Gson a type it resolved to raw `LinkedTreeMap` elements instead
+  of the real entity — every restore threw and failed. Found while
+  building the sharing feature above (which briefly carried the same
+  bug); both now use `TypeToken.getParameterized`, Gson's documented
+  approach for this.
+- Pinned the Gradle wrapper download to its published SHA-256
+  (`distributionSha256Sum`), closing off a supply-chain tampering vector
+  in the build itself — part of F-Droid submission prep.
 
 **v0.3.7** — map-scope correctness and usability pass:
 
