@@ -29,6 +29,20 @@ already use on Play; the internal code package stays
 
 ## Status
 
+**v0.3.11** — R8 enabled:
+
+- Release builds now run R8 code shrinking/obfuscation
+  (`isMinifyEnabled = true`, `isShrinkResources = true`), requested
+  during F-Droid review. Added `app/proguard-rules.pro` keeping every
+  Room entity (`data/local/Entities.kt`) and model DTO
+  (`model/Models.kt`) whole, since `Backup.kt` and `ShareBundle.kt`
+  serialize them via Gson reflection for backup export/import and
+  device-to-device sharing - a stripped or renamed field there would
+  silently corrupt exported JSON rather than crash. Verified on a real
+  device: exported a backup and a project share, confirmed every field
+  name survived intact in the resulting JSON, then restored the backup
+  with no errors.
+
 **v0.3.10** — F-Droid build fix:
 
 - Disabled AGP's automatic "dependency metadata" block

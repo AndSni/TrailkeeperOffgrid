@@ -30,8 +30,8 @@ android {
         applicationId = "com.trailkeeperoffgrid.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.3.10"
+        versionCode = 19
+        versionName = "0.3.11"
         // No API base URLs: Trailkeeper Offgrid has no backend. The only
         // network use is the optional map-region download and update check
         // (see docs/BLUEPRINT.md sec 5 / 7.6), which use absolute URLs.
@@ -50,7 +50,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // Falls back to the debug signing config when keystore.properties
             // is absent (local `assembleRelease` without secrets).
             signingConfig =

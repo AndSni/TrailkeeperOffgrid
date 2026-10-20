@@ -1,0 +1,1 @@
+Enabled R8 code shrinking/obfuscation for release builds, as requested during F-Droid review. Added keep rules for every Room entity and model class, since Gson serializes them by reflection for backup export/import and device-to-device sharing - verified directly on-device that both still produce byte-correct JSON after minification. No user-facing feature changes.
