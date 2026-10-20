@@ -22,9 +22,9 @@ Binaries:
   https://github.com/AndSni/TrailkeeperOffgrid/releases/download/v%v/TrailkeeperOffgrid.apk
 
 Builds:
-  - versionName: 0.3.10
-    versionCode: 18
-    commit: 1b7170140af0975ba6bc3017270bc1926ea2a713
+  - versionName: 0.3.11
+    versionCode: 19
+    commit: be120aaa38494ed73cb6b96ec9d96083586fdb1f
     # android/ is the Gradle root (gradlew lives here); the app module -
     # and its build/outputs/apk/release/ - is android/app. F-Droid's
     # build tooling searches for the output APK directly under `subdir`,
@@ -38,5 +38,5 @@ AllowedAPKSigningKeys: a931a9954c4cf37bef40b272fee9dadfd233d57accb0e82286c2dac77
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.3.10
-CurrentVersionCode: 18
+CurrentVersion: 0.3.11
+CurrentVersionCode: 19
